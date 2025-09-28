@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+  namespace: insightlearn-ai
+  labels:
+    app: ollama
+    component: ai-engine
+    service-type: internal
+spec:
+  type: ClusterIP
+  ports:
+  - port: 11434
+    targetPort: 11434
+    protocol: TCP
+    name: http
+  selector:
+    app: ollama
+  sessionAffinity: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-headless
+  namespace: insightlearn-ai
+  labels:
+    app: ollama
+    component: ai-engine
+    service-type: headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 11434
+    targetPort: 11434
+    protocol: TCP
+    name: http
+  selector:
+    app: ollama
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ollama-network-policy
+  namespace: insightlearn-ai
+spec:
+  podSelector:
+    matchLabels:
+      app: ollama
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: insightlearn-ai
+    - namespaceSelector:
+        matchLabels:
+          name: insightlearn
+    ports:
+    - protocol: TCP
+      port: 11434
+  egress:
+  - {} # Allow all outbound traffic for model downloads

@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # SQL Server for main database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: insightlearn-sqlserver
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: "InsightLearn@2024"
+      MSSQL_PID: Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - insightlearn-network
+
+  # MongoDB for video and content storage
+  mongodb:
+    image: mongo:7
+    container_name: insightlearn-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: "InsightLearn@2024"
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - insightlearn-network
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: insightlearn-redis
+    command: redis-server --requirepass "InsightLearn@2024"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - insightlearn-network
+
+  # Elasticsearch for search and analytics
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: insightlearn-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - insightlearn-network
+
+  # Ollama for AI functionality
+  ollama:
+    image: ollama/ollama:latest
+    container_name: insightlearn-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - insightlearn-network
+
+volumes:
+  sqlserver_data:
+  mongodb_data:
+  redis_data:
+  elasticsearch_data:
+  ollama_data:
+
+networks:
+  insightlearn-network:
+    driver: bridge

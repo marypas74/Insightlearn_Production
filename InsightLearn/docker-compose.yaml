@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: insightlearn-db
+    environment:
+      POSTGRES_DB: insightlearn
+      POSTGRES_USER: insightuser
+      POSTGRES_PASSWORD: insightlearn123
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - insightlearn-network
+
+  backend:
+    build: ./backend
+    container_name: insightlearn-backend
+    environment:
+      DATABASE_URL: postgresql://insightuser:insightlearn123@postgres:5432/insightlearn
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+    networks:
+      - insightlearn-network
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build: ./frontend
+    container_name: insightlearn-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - insightlearn-network
+
+volumes:
+  postgres-data:
+
+networks:
+  insightlearn-network:
+    driver: bridge

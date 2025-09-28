@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-api
+  namespace: insightlearn
+  labels:
+    app: insightlearn-api
+    version: "1.0.0"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: insightlearn-api
+  template:
+    metadata:
+      labels:
+        app: insightlearn-api
+        version: "1.0.0"
+    spec:
+      containers:
+      - name: api
+        image: insightlearn/api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8443
+          name: https
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        - name: ConnectionStrings__DefaultConnection
+          value: "Server=postgresql.insightlearn-data.svc.cluster.local;Port=5432;Database=insightlearn;User Id=insightlearn;Password=InsightLearn2024!"
+        - name: ConnectionStrings__MongoDb
+          value: "mongodb://insightlearn:InsightLearn2024!@mongodb.insightlearn-data.svc.cluster.local:27017/insightlearn"
+        - name: ConnectionStrings__Redis
+          value: "redis.insightlearn-data.svc.cluster.local:6379,password=InsightLearn2024!"
+        - name: ConnectionStrings__Elasticsearch
+          value: "http://elasticsearch.insightlearn-data.svc.cluster.local:9200"
+        - name: AI__OllamaUrl
+          value: "http://ollama.insightlearn-ai.svc.cluster.local:11434"
+        - name: JWT__SecretKey
+          value: "SuperSecretKeyForJWTTokensInsightLearnPlatform2024"
+        - name: JWT__Issuer
+          value: "InsightLearn.Cloud"
+        - name: JWT__Audience
+          value: "InsightLearn.Users"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: appsettings
+          mountPath: /app/appsettings.Production.json
+          subPath: appsettings.Production.json
+        - name: video-storage
+          mountPath: /app/videos
+      volumes:
+      - name: appsettings
+        configMap:
+          name: api-config
+      - name: video-storage
+        persistentVolumeClaim:
+          claimName: video-storage-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: video-storage-pvc
+  namespace: insightlearn
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightlearn-api-service
+  namespace: insightlearn
+  labels:
+    app: insightlearn-api
+spec:
+  selector:
+    app: insightlearn-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: insightlearn-api-hpa
+  namespace: insightlearn
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: insightlearn-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

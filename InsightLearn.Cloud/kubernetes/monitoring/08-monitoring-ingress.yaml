@@ -1,0 +1,309 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-ingress
+  namespace: insightlearn-monitoring
+  labels:
+    app: monitoring-ingress
+    component: networking
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    # Authentication (basic auth for monitoring tools)
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: monitoring-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'InsightLearn Monitoring - Authentication Required'
+spec:
+  rules:
+  # Prometheus
+  - host: prometheus.insightlearn.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+  # Grafana
+  - host: grafana.insightlearn.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  # AlertManager
+  - host: alertmanager.insightlearn.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: alertmanager
+            port:
+              number: 9093
+  # Kibana
+  - host: kibana.insightlearn.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kibana
+            port:
+              number: 5601
+
+---
+# Health Dashboard Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: health-dashboard-ingress
+  namespace: insightlearn
+  labels:
+    app: health-dashboard-ingress
+    component: networking
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+spec:
+  rules:
+  - host: health.insightlearn.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: insightlearn-health-dashboard
+            port:
+              number: 8080
+
+---
+# Basic Auth Secret for monitoring tools
+apiVersion: v1
+kind: Secret
+metadata:
+  name: monitoring-basic-auth
+  namespace: insightlearn-monitoring
+  labels:
+    app: monitoring-auth
+type: Opaque
+data:
+  # Username: admin, Password: InsightLearn2024!
+  # Generated with: htpasswd -nb admin InsightLearn2024!
+  auth: YWRtaW46JGFwcjEkNW9uRzJGNkokWVZma2E1VzBxU3RNSGVpSHZXaVcxMAo=
+
+---
+# Monitoring Services External Access Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-access-config
+  namespace: insightlearn-monitoring
+  labels:
+    app: monitoring-access
+data:
+  access-info.txt: |
+    InsightLearn Monitoring Access Information
+    ========================================
+
+    Web Interfaces:
+    ---------------
+    Prometheus:    http://prometheus.insightlearn.local
+    Grafana:       http://grafana.insightlearn.local
+    AlertManager:  http://alertmanager.insightlearn.local
+    Kibana:        http://kibana.insightlearn.local
+    Health:        http://health.insightlearn.local
+
+    Default Credentials:
+    -------------------
+    Monitoring Tools: admin / InsightLearn2024!
+    Grafana:         admin / InsightLearn2024!
+
+    Internal Service URLs:
+    ---------------------
+    Prometheus:    http://prometheus.insightlearn-monitoring.svc.cluster.local:9090
+    Grafana:       http://grafana.insightlearn-monitoring.svc.cluster.local:3000
+    AlertManager:  http://alertmanager.insightlearn-monitoring.svc.cluster.local:9093
+    Kibana:        http://kibana.insightlearn-monitoring.svc.cluster.local:5601
+    Health:        http://insightlearn-health-dashboard.insightlearn.svc.cluster.local:8080
+
+    Notes:
+    ------
+    - All monitoring tools are protected with basic authentication
+    - Health dashboard is publicly accessible (no auth required)
+    - Configure your /etc/hosts file for local development:
+      127.0.0.1 prometheus.insightlearn.local
+      127.0.0.1 grafana.insightlearn.local
+      127.0.0.1 alertmanager.insightlearn.local
+      127.0.0.1 kibana.insightlearn.local
+      127.0.0.1 health.insightlearn.local
+
+---
+# Port-forward helper script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: port-forward-script
+  namespace: insightlearn-monitoring
+  labels:
+    app: port-forward-helper
+data:
+  port-forward.sh: |
+    #!/bin/bash
+
+    echo "=== InsightLearn Monitoring Port Forward Helper ==="
+    echo "This script will set up port forwarding for all monitoring services"
+    echo ""
+
+    # Check if kubectl is available
+    if ! command -v kubectl &> /dev/null; then
+        echo "Error: kubectl is not installed or not in PATH"
+        exit 1
+    fi
+
+    # Function to start port forwarding in background
+    start_port_forward() {
+        local service=$1
+        local namespace=$2
+        local local_port=$3
+        local remote_port=$4
+
+        echo "Starting port forward for $service..."
+        kubectl port-forward -n $namespace svc/$service $local_port:$remote_port &
+        echo "  -> http://localhost:$local_port"
+    }
+
+    echo "Starting port forwards..."
+    echo ""
+
+    # Start all port forwards
+    start_port_forward "prometheus" "insightlearn-monitoring" "9090" "9090"
+    start_port_forward "grafana" "insightlearn-monitoring" "3000" "3000"
+    start_port_forward "alertmanager" "insightlearn-monitoring" "9093" "9093"
+    start_port_forward "kibana" "insightlearn-monitoring" "5601" "5601"
+    start_port_forward "insightlearn-health-dashboard" "insightlearn" "8080" "8080"
+
+    echo ""
+    echo "Port forwards started! Access the services at:"
+    echo "  Prometheus:    http://localhost:9090"
+    echo "  Grafana:       http://localhost:3000 (admin/InsightLearn2024!)"
+    echo "  AlertManager:  http://localhost:9093"
+    echo "  Kibana:        http://localhost:5601"
+    echo "  Health:        http://localhost:8080"
+    echo ""
+    echo "Press Ctrl+C to stop all port forwards"
+
+    # Wait for interrupt
+    wait
+
+  stop-port-forward.sh: |
+    #!/bin/bash
+
+    echo "Stopping all kubectl port-forward processes..."
+    pkill -f "kubectl port-forward"
+    echo "All port forwards stopped."
+
+---
+# NetworkPolicy for monitoring namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-network-policy
+  namespace: insightlearn-monitoring
+  labels:
+    app: monitoring-network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from nginx-ingress
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 9093
+    - protocol: TCP
+      port: 5601
+  # Allow ingress from insightlearn namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: insightlearn
+    ports:
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 9093
+    - protocol: TCP
+      port: 5601
+  # Allow ingress from same namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: insightlearn-monitoring
+  egress:
+  # Allow egress to insightlearn namespace for scraping
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: insightlearn
+  # Allow egress to insightlearn-data namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: insightlearn-data
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 27017
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 9200
+  # Allow egress to insightlearn-ai namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: insightlearn-ai
+  # Allow egress to same namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: insightlearn-monitoring
+  # Allow egress to DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow egress to internet for updates/notifications
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443

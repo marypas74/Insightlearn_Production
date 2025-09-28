@@ -1,0 +1,87 @@
+# ===============================
+# INSIGHTLEARN PRODUCTION GITIGNORE
+# ===============================
+
+# 🔐 Security & Secrets
+*.key
+*.crt
+*.pem
+secrets/
+*secret*
+*token*
+*credential*
+.env
+.env.*
+
+# 📊 Logs & Runtime Data
+logs/
+*.log
+deployment.log
+startup.log
+*.pid
+*.seed
+*.pid.lock
+
+# 🔧 Temporary Files
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 🐳 Docker
+.dockerignore
+docker-compose.override.yml
+
+# ☸️ Kubernetes Runtime
+.minikube/
+.kube/config
+kubeconfig
+*.kubeconfig
+
+# 🏗️ Build Artifacts
+node_modules/
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 📱 IDE & Editors
+.vscode/
+.idea/
+*.sublime-*
+.vs/
+
+# 🔄 Backup Files
+*.backup
+*.bak
+*_backup
+backup_*
+
+# 📈 Monitoring Data
+prometheus/
+grafana/
+elasticsearch/data/
+
+# 🚫 OS Generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 🎯 Production Specific
+# Include production configs but not secrets
+!insightlearn-startup.sh
+!CLAUDE.md
+!GUIDA_AVVIO_AUTOMATICO.md
+!*.yaml
+!*.yml
+!Makefile

@@ -1,0 +1,108 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: insightlearn-data-init
+  namespace: insightlearn
+spec:
+  template:
+    spec:
+      containers:
+      - name: data-init
+        image: postgres:13
+        env:
+        - name: PGPASSWORD
+          value: "insightlearn123"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Inizializzazione dati InsightLearn..."
+
+          # Attende che il database sia pronto
+          until pg_isready -h postgres-service -p 5432 -U admin; do
+            echo "Aspettando PostgreSQL..."
+            sleep 2
+          done
+
+          # Crea le tabelle se non esistono
+          psql -h postgres-service -U admin -d insightlearn << 'EOF'
+
+          -- Tabella corsi
+          CREATE TABLE IF NOT EXISTS courses (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(200) NOT NULL,
+            description TEXT,
+            instructor VARCHAR(100),
+            duration_hours INTEGER,
+            price DECIMAL(8,2),
+            category VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            students_enrolled INTEGER DEFAULT 0
+          );
+
+          -- Tabella utenti
+          CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            full_name VARCHAR(100),
+            role VARCHAR(20) DEFAULT 'student',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP
+          );
+
+          -- Tabella iscrizioni
+          CREATE TABLE IF NOT EXISTS enrollments (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            course_id INTEGER REFERENCES courses(id),
+            enrollment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            progress INTEGER DEFAULT 0,
+            completed BOOLEAN DEFAULT FALSE
+          );
+
+          -- Dati di esempio per corsi
+          INSERT INTO courses (title, description, instructor, duration_hours, price, category, students_enrolled) VALUES
+          ('Introduzione a Python', 'Corso base per imparare Python da zero', 'Prof. Marco Rossi', 40, 199.99, 'Programmazione', 156),
+          ('Machine Learning Avanzato', 'Algoritmi e tecniche di ML per esperti', 'Dr.ssa Anna Bianchi', 60, 399.99, 'Data Science', 89),
+          ('Sviluppo Web con React', 'Costruisci applicazioni moderne con React', 'Ing. Luigi Verdi', 35, 249.99, 'Web Development', 203),
+          ('Docker e Kubernetes', 'Containerizzazione e orchestrazione', 'DevOps Engineer Sara Neri', 45, 299.99, 'DevOps', 134),
+          ('Cybersecurity Fundamentals', 'Basi della sicurezza informatica', 'Hacker Etico Paolo Blu', 50, 349.99, 'Security', 78),
+          ('Database Design', 'Progettazione di database relazionali', 'DBA Maria Gialli', 30, 179.99, 'Database', 167),
+          ('UI/UX Design', 'Principi di design per interfacce utente', 'Designer Alex Rosa', 25, 229.99, 'Design', 245),
+          ('Blockchain Development', 'Sviluppo di applicazioni blockchain', 'Crypto Dev Tom Viola', 55, 449.99, 'Blockchain', 67);
+
+          -- Dati di esempio per utenti
+          INSERT INTO users (username, email, full_name, role, last_login) VALUES
+          ('admin', 'admin@insightlearn.com', 'Amministratore Sistema', 'admin', NOW()),
+          ('mrossi', 'marco.rossi@email.com', 'Marco Rossi', 'instructor', NOW() - INTERVAL '2 hours'),
+          ('abianchi', 'anna.bianchi@email.com', 'Anna Bianchi', 'instructor', NOW() - INTERVAL '1 day'),
+          ('student1', 'mario.studente@email.com', 'Mario Studente', 'student', NOW() - INTERVAL '30 minutes'),
+          ('student2', 'laura.corsista@email.com', 'Laura Corsista', 'student', NOW() - INTERVAL '1 hour'),
+          ('student3', 'francesco.apprendista@email.com', 'Francesco Apprendista', 'student', NOW() - INTERVAL '3 hours'),
+          ('moderator', 'mod@insightlearn.com', 'Moderatore Contenuti', 'moderator', NOW() - INTERVAL '6 hours');
+
+          -- Iscrizioni di esempio
+          INSERT INTO enrollments (user_id, course_id, progress, completed) VALUES
+          (4, 1, 75, false),  -- Mario al corso Python
+          (4, 3, 100, true),   -- Mario completato React
+          (5, 2, 45, false),   -- Laura al corso ML
+          (5, 7, 90, false),   -- Laura al corso UI/UX
+          (6, 1, 30, false),   -- Francesco al corso Python
+          (6, 4, 60, false),   -- Francesco al corso Docker
+          (6, 6, 100, true);   -- Francesco completato Database
+
+          -- Aggiorna il conteggio studenti iscritti
+          UPDATE courses SET students_enrolled = (
+            SELECT COUNT(*) FROM enrollments WHERE course_id = courses.id
+          );
+
+          EOF
+
+          echo "✅ Dati InsightLearn inizializzati con successo!"
+          echo "📊 Corsi disponibili: 8"
+          echo "👥 Utenti registrati: 7"
+          echo "📝 Iscrizioni attive: 7"
+
+      restartPolicy: Never
+  backoffLimit: 3

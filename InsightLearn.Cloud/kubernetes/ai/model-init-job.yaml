@@ -1,0 +1,181 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-model-init
+  namespace: insightlearn-ai
+  labels:
+    app: ollama
+    component: model-initialization
+    job-type: one-time
+spec:
+  ttlSecondsAfterFinished: 86400  # Clean up after 24 hours
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: ollama
+        component: model-initialization
+    spec:
+      restartPolicy: Never
+      initContainers:
+      - name: wait-for-ollama
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for Ollama service to be ready..."
+          until nc -z ollama-service 11434; do
+            echo "Ollama service not ready yet, waiting..."
+            sleep 10
+          done
+          echo "Ollama service is ready!"
+      containers:
+      - name: model-downloader
+        image: curlimages/curl:8.4.0
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          OLLAMA_URL="http://ollama-service:11434"
+
+          echo "Starting model initialization..."
+
+          # Function to pull a model
+          pull_model() {
+            local model=$1
+            echo "Pulling model: $model"
+
+            # Pull the model
+            curl -X POST "$OLLAMA_URL/api/pull" \
+              -H "Content-Type: application/json" \
+              -d "{\"name\":\"$model\"}" \
+              --max-time 1800 \
+              --retry 3 \
+              --retry-delay 30 || {
+                echo "Failed to pull model: $model"
+                return 1
+              }
+
+            echo "Successfully pulled model: $model"
+
+            # Verify the model
+            echo "Verifying model: $model"
+            curl -X POST "$OLLAMA_URL/api/generate" \
+              -H "Content-Type: application/json" \
+              -d "{\"model\":\"$model\",\"prompt\":\"Hello\",\"stream\":false}" \
+              --max-time 60 || {
+                echo "Warning: Failed to verify model: $model"
+                return 1
+              }
+
+            echo "Model verified successfully: $model"
+          }
+
+          # Pull required models
+          echo "=== Pulling llama2:7b for general Q&A ==="
+          pull_model "llama2:7b"
+
+          echo "=== Pulling codellama for code assistance ==="
+          pull_model "codellama"
+
+          echo "=== Pulling mistral for content analysis ==="
+          pull_model "mistral"
+
+          echo "=== All models initialized successfully ==="
+
+          # List available models
+          echo "=== Available models ==="
+          curl -s "$OLLAMA_URL/api/tags" | grep -o '"name":"[^"]*"' || echo "Could not list models"
+
+          echo "Model initialization completed!"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-verification-script
+  namespace: insightlearn-ai
+data:
+  verify-models.sh: |
+    #!/bin/bash
+    set -e
+
+    OLLAMA_URL="http://ollama-service:11434"
+
+    echo "Verifying all models are available..."
+
+    # Check if models are available
+    models_response=$(curl -s "$OLLAMA_URL/api/tags" || echo '{"models":[]}')
+
+    required_models=("llama2:7b" "codellama" "mistral")
+
+    for model in "${required_models[@]}"; do
+      if echo "$models_response" | grep -q "\"$model\""; then
+        echo "✓ Model $model is available"
+
+        # Test the model with a simple prompt
+        test_response=$(curl -s -X POST "$OLLAMA_URL/api/generate" \
+          -H "Content-Type: application/json" \
+          -d "{\"model\":\"$model\",\"prompt\":\"Say hello\",\"stream\":false}" \
+          --max-time 30)
+
+        if [ $? -eq 0 ] && [ -n "$test_response" ]; then
+          echo "✓ Model $model is working correctly"
+        else
+          echo "✗ Model $model failed test"
+        fi
+      else
+        echo "✗ Model $model is not available"
+      fi
+    done
+
+    echo "Model verification completed!"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: model-health-check
+  namespace: insightlearn-ai
+  labels:
+    app: ollama
+    component: health-check
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: health-checker
+            image: curlimages/curl:8.4.0
+            command:
+            - sh
+            - -c
+            - |
+              source /scripts/verify-models.sh
+            volumeMounts:
+            - name: verification-script
+              mountPath: /scripts
+              readOnly: true
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
+          volumes:
+          - name: verification-script
+            configMap:
+              name: model-verification-script
+              defaultMode: 0755

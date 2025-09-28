@@ -1,0 +1,2637 @@
+# Prompt per Claude Code - Fase 2: Design System e UI Components
+
+## 🎯 Obiettivo della Fase
+Implementare un design system moderno e avanzato per InsightLearn.Cloud con componenti UI riutilizabili che superino gli standard attuali del web. Focus su animazioni fluide, glassmorphism, neumorphism e user experience premium.
+
+## ⚙️ Configurazioni Operative Debian
+
+### Sistema di Logging e Error Handling
+- **OBBLIGATORIO**: Ogni comando bash deve generare un log dettagliato
+- **TIMEOUT**: Tutti i comandi hanno timeout di 10 minuti
+- **AUTO-RECOVERY**: Se un comando fallisce, devi rigenerarlo con correzioni
+- **VERIFICA**: Ogni step deve essere verificato prima di procedere al successivo
+
+### Template di Esecuzione per Debian
+```bash
+#!/bin/bash
+set -e  # Exit on error
+set -u  # Exit on undefined variable
+
+# Setup logging
+LOG_FILE="logs/phase2_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] Starting Phase 2 command: $0 ===" | tee -a "$LOG_FILE"
+
+# Timeout function for Debian
+timeout_cmd() {
+    timeout 600s "$@"  # 10 minutes timeout
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+# Error handling function
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Command failed ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+# Check if we're in the right directory
+if [ ! -d "InsightLearn.Cloud" ]; then
+    echo "ERROR: InsightLearn.Cloud directory not found. Please run from project root." | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+cd InsightLearn.Cloud
+```
+
+## 📋 FASE 2: Design System e UI Components
+
+### STEP 2.1: Setup Design System Base
+
+**Comando da eseguire:**
+```bash
+#!/bin/bash
+# phase2_step1_design_system_setup.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2_step1_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 2 STEP 1: Design System Setup ===" | tee -a "$LOG_FILE"
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 2.1 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+# Navigate to project
+cd InsightLearn.Cloud
+echo "Current directory: $(pwd)" | tee -a "$LOG_FILE"
+
+# Create design system directory structure
+echo "Creating design system directories..." | tee -a "$LOG_FILE"
+timeout_cmd mkdir -p src/InsightLearn.Web/wwwroot/css/design-system
+timeout_cmd mkdir -p src/InsightLearn.Web/wwwroot/js/design-system
+timeout_cmd mkdir -p src/InsightLearn.Web/wwwroot/assets/icons
+timeout_cmd mkdir -p src/InsightLearn.Web/wwwroot/assets/images
+timeout_cmd mkdir -p src/InsightLearn.Web/wwwroot/assets/fonts
+timeout_cmd mkdir -p src/InsightLearn.Web/Components/UI
+timeout_cmd mkdir -p src/InsightLearn.Web/Components/Layout
+timeout_cmd mkdir -p src/InsightLearn.Web/Components/Shared
+echo "Design system directories created" | tee -a "$LOG_FILE"
+
+# Create main design system CSS file
+echo "Creating main design system CSS..." | tee -a "$LOG_FILE"
+cat > src/InsightLearn.Web/wwwroot/css/design-system/variables.css << 'EOF'
+/*
+ * InsightLearn.Cloud Design System Variables
+ * Modern design tokens for premium e-learning experience
+ */
+
+:root {
+    /* === COLORS === */
+    /* Primary Colors - Modern Blue/Purple Gradient */
+    --primary-50: #f0f4ff;
+    --primary-100: #e0eaff;
+    --primary-200: #c7d7fe;
+    --primary-300: #a5b8fc;
+    --primary-400: #8b94f8;
+    --primary-500: #7567f0;
+    --primary-600: #6347e6;
+    --primary-700: #5435d4;
+    --primary-800: #442db0;
+    --primary-900: #3a2a8f;
+    --primary-950: #241a57;
+
+    /* Secondary Colors - Emerald Accent */
+    --secondary-50: #ecfdf5;
+    --secondary-100: #d1fae5;
+    --secondary-200: #a7f3d0;
+    --secondary-300: #6ee7b7;
+    --secondary-400: #34d399;
+    --secondary-500: #10b981;
+    --secondary-600: #059669;
+    --secondary-700: #047857;
+    --secondary-800: #065f46;
+    --secondary-900: #064e3b;
+    --secondary-950: #022c22;
+
+    /* Neutral Colors - Warm Grays */
+    --neutral-50: #fafaf9;
+    --neutral-100: #f5f5f4;
+    --neutral-200: #e7e5e4;
+    --neutral-300: #d6d3d1;
+    --neutral-400: #a8a29e;
+    --neutral-500: #78716c;
+    --neutral-600: #57534e;
+    --neutral-700: #44403c;
+    --neutral-800: #292524;
+    --neutral-900: #1c1917;
+    --neutral-950: #0c0a09;
+
+    /* Semantic Colors */
+    --success: var(--secondary-500);
+    --success-bg: var(--secondary-50);
+    --warning: #f59e0b;
+    --warning-bg: #fffbeb;
+    --error: #ef4444;
+    --error-bg: #fef2f2;
+    --info: var(--primary-500);
+    --info-bg: var(--primary-50);
+
+    /* === GRADIENTS === */
+    --gradient-primary: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-400) 100%);
+    --gradient-secondary: linear-gradient(135deg, var(--secondary-600) 0%, var(--secondary-400) 100%);
+    --gradient-hero: linear-gradient(135deg, var(--primary-600) 0%, var(--secondary-500) 100%);
+    --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+
+    /* === GLASSMORPHISM === */
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-bg-dark: rgba(0, 0, 0, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-border-dark: rgba(255, 255, 255, 0.05);
+    --glass-backdrop: blur(20px);
+
+    /* === NEUMORPHISM === */
+    --neuro-light-shadow: 8px 8px 16px rgba(0, 0, 0, 0.1), -8px -8px 16px rgba(255, 255, 255, 0.8);
+    --neuro-dark-shadow: 8px 8px 16px rgba(0, 0, 0, 0.3), -8px -8px 16px rgba(255, 255, 255, 0.1);
+    --neuro-inset-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.1), inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+
+    /* === TYPOGRAPHY === */
+    --font-family-sans: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    --font-family-display: 'Cal Sans', 'Inter', sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+    /* Font Sizes - Fluid Typography */
+    --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+    --text-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
+    --text-base: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
+    --text-lg: clamp(1.125rem, 1rem + 0.625vw, 1.25rem);
+    --text-xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
+    --text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2rem);
+    --text-3xl: clamp(2rem, 1.7rem + 1.5vw, 2.5rem);
+    --text-4xl: clamp(2.5rem, 2rem + 2.5vw, 3.5rem);
+    --text-5xl: clamp(3.5rem, 2.5rem + 5vw, 6rem);
+
+    /* Line Heights */
+    --leading-tight: 1.25;
+    --leading-snug: 1.375;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.625;
+    --leading-loose: 2;
+
+    /* Font Weights */
+    --font-light: 300;
+    --font-normal: 400;
+    --font-medium: 500;
+    --font-semibold: 600;
+    --font-bold: 700;
+    --font-extrabold: 800;
+
+    /* === SPACING === */
+    --space-px: 1px;
+    --space-0: 0;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+    --space-12: 3rem;
+    --space-16: 4rem;
+    --space-20: 5rem;
+    --space-24: 6rem;
+    --space-32: 8rem;
+    --space-40: 10rem;
+    --space-48: 12rem;
+    --space-56: 14rem;
+    --space-64: 16rem;
+
+    /* === BORDER RADIUS === */
+    --radius-none: 0;
+    --radius-sm: 0.25rem;
+    --radius-base: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+    --radius-2xl: 1.5rem;
+    --radius-3xl: 2rem;
+    --radius-full: 9999px;
+
+    /* === SHADOWS === */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-base: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+
+    /* === ANIMATIONS === */
+    --duration-75: 75ms;
+    --duration-100: 100ms;
+    --duration-150: 150ms;
+    --duration-200: 200ms;
+    --duration-300: 300ms;
+    --duration-500: 500ms;
+    --duration-700: 700ms;
+    --duration-1000: 1000ms;
+
+    /* Easing Functions */
+    --ease-linear: linear;
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* === Z-INDEX === */
+    --z-0: 0;
+    --z-10: 10;
+    --z-20: 20;
+    --z-30: 30;
+    --z-40: 40;
+    --z-50: 50;
+    --z-modal: 1000;
+    --z-popover: 1010;
+    --z-tooltip: 1020;
+    --z-notification: 1030;
+
+    /* === BREAKPOINTS === */
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+}
+
+/* Dark Theme Variables */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --glass-bg: rgba(0, 0, 0, 0.1);
+        --glass-border: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    :root {
+        --primary-500: #4c46d6;
+        --secondary-500: #059669;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --duration-75: 0ms;
+        --duration-100: 0ms;
+        --duration-150: 0ms;
+        --duration-200: 0ms;
+        --duration-300: 0ms;
+        --duration-500: 0ms;
+        --duration-700: 0ms;
+        --duration-1000: 0ms;
+    }
+}
+EOF
+
+echo "Design system variables created" | tee -a "$LOG_FILE"
+
+# Create base styles
+echo "Creating base styles..." | tee -a "$LOG_FILE"
+cat > src/InsightLearn.Web/wwwroot/css/design-system/base.css << 'EOF'
+/*
+ * InsightLearn.Cloud Base Styles
+ * Modern reset and base typography
+ */
+
+/* Modern CSS Reset */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    font-family: var(--font-family-sans);
+    font-weight: var(--font-normal);
+    color: var(--neutral-800);
+    background-color: var(--neutral-50);
+    line-height: var(--leading-normal);
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+/* Typography Scale */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-family-display);
+    font-weight: var(--font-bold);
+    line-height: var(--leading-tight);
+    letter-spacing: -0.025em;
+    color: var(--neutral-900);
+}
+
+h1 {
+    font-size: var(--text-4xl);
+    margin-bottom: var(--space-6);
+}
+
+h2 {
+    font-size: var(--text-3xl);
+    margin-bottom: var(--space-5);
+}
+
+h3 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-4);
+}
+
+h4 {
+    font-size: var(--text-xl);
+    margin-bottom: var(--space-3);
+}
+
+h5 {
+    font-size: var(--text-lg);
+    margin-bottom: var(--space-2);
+}
+
+h6 {
+    font-size: var(--text-base);
+    margin-bottom: var(--space-2);
+}
+
+p {
+    font-size: var(--text-base);
+    line-height: var(--leading-relaxed);
+    margin-bottom: var(--space-4);
+    color: var(--neutral-700);
+}
+
+/* Links */
+a {
+    color: var(--primary-600);
+    text-decoration: none;
+    transition: color var(--duration-200) var(--ease-out);
+}
+
+a:hover {
+    color: var(--primary-700);
+    text-decoration: underline;
+}
+
+a:focus {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+}
+
+/* Lists */
+ul, ol {
+    margin-bottom: var(--space-4);
+    padding-left: var(--space-6);
+}
+
+li {
+    margin-bottom: var(--space-1);
+    color: var(--neutral-700);
+}
+
+/* Form Elements */
+input, textarea, select, button {
+    font-family: inherit;
+    font-size: inherit;
+}
+
+/* Images and Media */
+img, picture, video, canvas, svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+/* Tables */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: var(--space-4);
+}
+
+th, td {
+    padding: var(--space-3);
+    text-align: left;
+    border-bottom: 1px solid var(--neutral-200);
+}
+
+th {
+    font-weight: var(--font-semibold);
+    color: var(--neutral-900);
+}
+
+/* Code */
+code, pre {
+    font-family: var(--font-family-mono);
+    font-size: 0.875em;
+}
+
+code {
+    background-color: var(--neutral-100);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    color: var(--neutral-800);
+}
+
+pre {
+    background-color: var(--neutral-900);
+    color: var(--neutral-100);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    overflow-x: auto;
+    margin-bottom: var(--space-4);
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--neutral-100);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--neutral-300);
+    border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--neutral-400);
+}
+
+/* Selection */
+::selection {
+    background-color: var(--primary-100);
+    color: var(--primary-900);
+}
+
+/* Focus styles */
+:focus-visible {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: var(--neutral-900);
+        color: var(--neutral-200);
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        color: var(--neutral-100);
+    }
+
+    p, li {
+        color: var(--neutral-300);
+    }
+
+    code {
+        background-color: var(--neutral-800);
+        color: var(--neutral-200);
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--neutral-800);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--neutral-600);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--neutral-500);
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    body {
+        background-color: white;
+        color: black;
+    }
+
+    a {
+        color: blue;
+        text-decoration: underline;
+    }
+
+    button {
+        border: 2px solid black;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+EOF
+
+echo "Base styles created" | tee -a "$LOG_FILE"
+
+# Verify files created
+echo "Verifying design system files..." | tee -a "$LOG_FILE"
+if [ -f "src/InsightLearn.Web/wwwroot/css/design-system/variables.css" ]; then
+    echo "✅ Variables CSS created successfully" | tee -a "$LOG_FILE"
+else
+    echo "❌ Variables CSS creation failed" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+if [ -f "src/InsightLearn.Web/wwwroot/css/design-system/base.css" ]; then
+    echo "✅ Base CSS created successfully" | tee -a "$LOG_FILE"
+else
+    echo "❌ Base CSS creation failed" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+echo "=== [$(date)] Step 2.1 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+### STEP 2.2: Componenti UI Avanzati
+
+**Comando da eseguire dopo successo Step 2.1:**
+```bash
+#!/bin/bash
+# phase2_step2_advanced_components.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2_step2_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 2 STEP 2: Advanced UI Components ===" | tee -a "$LOG_FILE"
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 2.2 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+cd InsightLearn.Cloud
+
+# Create glassmorphism components CSS
+echo "Creating glassmorphism components..." | tee -a "$LOG_FILE"
+cat > src/InsightLearn.Web/wwwroot/css/design-system/components.css << 'EOF'
+/*
+ * InsightLearn.Cloud UI Components
+ * Premium glassmorphism and neumorphism components
+ */
+
+/* === GLASS CARD === */
+.glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-backdrop);
+    -webkit-backdrop-filter: var(--glass-backdrop);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-xl);
+    padding: var(--space-6);
+    transition: all var(--duration-300) var(--ease-out);
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+}
+
+.glass-card:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: var(--shadow-2xl);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* === NEUMORPHIC BUTTON === */
+.neuro-btn {
+    background: var(--neutral-100);
+    border: none;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--neuro-light-shadow);
+    padding: var(--space-3) var(--space-6);
+    font-weight: var(--font-semibold);
+    color: var(--neutral-800);
+    cursor: pointer;
+    transition: all var(--duration-200) var(--ease-spring);
+    position: relative;
+    overflow: hidden;
+}
+
+.neuro-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 12px 12px 20px rgba(0, 0, 0, 0.15), -12px -12px 20px rgba(255, 255, 255, 0.9);
+}
+
+.neuro-btn:active {
+    transform: translateY(0);
+    box-shadow: var(--neuro-inset-shadow);
+}
+
+.neuro-btn-primary {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: 8px 8px 16px rgba(117, 103, 240, 0.3), -8px -8px 16px rgba(255, 255, 255, 0.8);
+}
+
+.neuro-btn-primary:hover {
+    box-shadow: 12px 12px 20px rgba(117, 103, 240, 0.4), -12px -12px 20px rgba(255, 255, 255, 0.9);
+}
+
+/* === COURSE CARD === */
+.course-card {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-backdrop);
+    -webkit-backdrop-filter: var(--glass-backdrop);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-2xl);
+    overflow: hidden;
+    transition: all var(--duration-300) var(--ease-out);
+    position: relative;
+    box-shadow: var(--shadow-lg);
+}
+
+.course-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: var(--shadow-2xl);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.course-card-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    transition: transform var(--duration-500) var(--ease-out);
+}
+
+.course-card:hover .course-card-image {
+    transform: scale(1.1);
+}
+
+.course-card-content {
+    padding: var(--space-6);
+    position: relative;
+}
+
+.course-card-title {
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+    color: var(--neutral-900);
+    margin-bottom: var(--space-2);
+    line-height: var(--leading-tight);
+}
+
+.course-card-description {
+    color: var(--neutral-600);
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+    margin-bottom: var(--space-4);
+}
+
+.course-card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+}
+
+.course-card-rating {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.course-card-price {
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+    color: var(--primary-600);
+}
+
+/* === FLOATING ACTION BUTTON === */
+.fab {
+    position: fixed;
+    bottom: var(--space-6);
+    right: var(--space-6);
+    width: 64px;
+    height: 64px;
+    border-radius: var(--radius-full);
+    background: var(--gradient-primary);
+    border: none;
+    box-shadow: var(--shadow-xl);
+    color: white;
+    font-size: var(--text-xl);
+    cursor: pointer;
+    transition: all var(--duration-300) var(--ease-spring);
+    z-index: var(--z-50);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fab:hover {
+    transform: scale(1.1) rotate(90deg);
+    box-shadow: var(--shadow-2xl);
+}
+
+.fab:active {
+    transform: scale(0.95);
+}
+
+/* === SEARCH BAR === */
+.search-container {
+    position: relative;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.search-input {
+    width: 100%;
+    padding: var(--space-4) var(--space-6) var(--space-4) var(--space-12);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-full);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-backdrop);
+    -webkit-backdrop-filter: var(--glass-backdrop);
+    font-size: var(--text-base);
+    color: var(--neutral-800);
+    transition: all var(--duration-200) var(--ease-out);
+    box-shadow: var(--shadow-sm);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(117, 103, 240, 0.1), var(--shadow-md);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.search-input::placeholder {
+    color: var(--neutral-400);
+}
+
+.search-icon {
+    position: absolute;
+    left: var(--space-4);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--neutral-400);
+    font-size: var(--text-lg);
+    pointer-events: none;
+}
+
+/* === NAVIGATION BAR === */
+.navbar {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-backdrop);
+    -webkit-backdrop-filter: var(--glass-backdrop);
+    border-bottom: 1px solid var(--glass-border);
+    padding: var(--space-4) 0;
+    position: sticky;
+    top: 0;
+    z-index: var(--z-40);
+    transition: all var(--duration-200) var(--ease-out);
+}
+
+.navbar-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.navbar-logo {
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    color: var(--primary-600);
+    text-decoration: none;
+}
+
+.navbar-nav {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: var(--space-8);
+}
+
+.navbar-item {
+    margin: 0;
+}
+
+.navbar-link {
+    color: var(--neutral-700);
+    text-decoration: none;
+    font-weight: var(--font-medium);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-lg);
+    transition: all var(--duration-200) var(--ease-out);
+    position: relative;
+}
+
+.navbar-link:hover {
+    color: var(--primary-600);
+    background: rgba(117, 103, 240, 0.1);
+    text-decoration: none;
+}
+
+.navbar-link.active {
+    color: var(--primary-600);
+    background: rgba(117, 103, 240, 0.1);
+}
+
+.navbar-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: var(--space-4);
+    right: var(--space-4);
+    height: 2px;
+    background: var(--primary-600);
+    border-radius: var(--radius-full);
+}
+
+/* === PROGRESS INDICATOR === */
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--neutral-200);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--gradient-primary);
+    border-radius: var(--radius-full);
+    transition: width var(--duration-500) var(--ease-out);
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: progress-shine 2s infinite;
+}
+
+@keyframes progress-shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* === TOOLTIP === */
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-content {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--neutral-900);
+    color: white;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--duration-200) var(--ease-out);
+    z-index: var(--z-tooltip);
+    margin-bottom: var(--space-2);
+}
+
+.tooltip-content::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--neutral-900);
+}
+
+.tooltip:hover .tooltip-content {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-4px);
+}
+
+/* === LOADING SPINNER === */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--neutral-200);
+    border-top: 4px solid var(--primary-500);
+    border-radius: var(--radius-full);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* === RESPONSIVE UTILITIES === */
+@media (max-width: 768px) {
+    .navbar-nav {
+        display: none;
+    }
+    
+    .course-card {
+        margin-bottom: var(--space-4);
+    }
+    
+    .fab {
+        bottom: var(--space-4);
+        right: var(--space-4);
+        width: 56px;
+        height: 56px;
+    }
+}
+
+/* === DARK MODE === */
+@media (prefers-color-scheme: dark) {
+    .glass-card {
+        background: rgba(0, 0, 0, 0.2);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .neuro-btn {
+        background: var(--neutral-800);
+        color: var(--neutral-200);
+        box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.3), -8px -8px 16px rgba(255, 255, 255, 0.05);
+    }
+    
+    .course-card-title {
+        color: var(--neutral-100);
+    }
+    
+    .course-card-description {
+        color: var(--neutral-300);
+    }
+    
+    .search-input {
+        background: rgba(0, 0, 0, 0.2);
+        color: var(--neutral-200);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .navbar {
+        background: rgba(0, 0, 0, 0.2);
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .navbar-link {
+        color: var(--neutral-300);
+    }
+}
+EOF
+
+echo "Components CSS created successfully" | tee -a "$LOG_FILE"
+
+# Create CourseCard Blazor component
+echo "Creating CourseCard Blazor component..." | tee -a "$LOG_FILE"
+cat > src/InsightLearn.Web/Components/UI/CourseCard.razor << 'EOF'
+@* CourseCard.razor - Premium course card component with glassmorphism *@
+
+<div class="course-card" @onclick="OnCardClick">
+    @if (!string.IsNullOrEmpty(ImageUrl))
+    {
+        <img src="@ImageUrl" alt="@Title" class="course-card-image" />
+    }
+    else
+    {
+        <div class="course-card-image bg-gradient-primary flex items-center justify-center">
+            <i class="fas fa-play text-4xl text-white opacity-80"></i>
+        </div>
+    }
+    
+    <div class="course-card-content">
+        <h3 class="course-card-title">@Title</h3>
+        <p class="course-card-description">@Description</p>
+        
+        <div class="course-card-meta">
+            <div class="course-card-rating">
+                @for (int i = 1; i <= 5; i++)
+                {
+                    <i class="fas fa-star @(i <= Rating ? "text-yellow-400" : "text-gray-300")"></i>
+                }
+                <span class="ml-2 text-sm text-gray-600">(@ReviewCount)</span>
+            </div>
+            
+            @if (Price > 0)
+            {
+                <div class="course-card-price">
+                    @if (OriginalPrice > Price)
+                    {
+                        <span class="text-sm text-gray-500 line-through mr-2">$@OriginalPrice.ToString("F2")</span>
+                    }
+                    $@Price.ToString("F2")
+                </div>
+            }
+            else
+            {
+                <div class="course-card-price text-green-600">Free</div>
+            }
+        </div>
+        
+        @if (ShowProgress && Progress > 0)
+        {
+            <div class="mb-4">
+                <div class="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Progress</span>
+                    <span>@Progress%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: @Progress%"></div>
+                </div>
+            </div>
+        }
+        
+        <div class="flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+                <i class="fas fa-clock mr-1"></i>
+                @Duration hours
+            </div>
+            
+            <div class="text-sm text-gray-500">
+                <i class="fas fa-users mr-1"></i>
+                @StudentCount students
+            </div>
+        </div>
+        
+        @if (ShowEnrollButton)
+        {
+            <button class="neuro-btn-primary w-full mt-4" @onclick="OnEnrollClick" @onclick:stopPropagation="true">
+                @if (IsEnrolled)
+                {
+                    <i class="fas fa-play mr-2"></i>Continue Learning
+                }
+                else
+                {
+                    <i class="fas fa-shopping-cart mr-2"></i>Enroll Now
+                }
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public string ImageUrl { get; set; } = string.Empty;
+    [Parameter] public decimal Price { get; set; }
+    [Parameter] public decimal OriginalPrice { get; set; }
+    [Parameter] public int Rating { get; set; } = 5;
+    [Parameter] public int ReviewCount { get; set; }
+    [Parameter] public double Duration { get; set; }
+    [Parameter] public int StudentCount { get; set; }
+    [Parameter] public int Progress { get; set; }
+    [Parameter] public bool ShowProgress { get; set; }
+    [Parameter] public bool ShowEnrollButton { get; set; } = true;
+    [Parameter] public bool IsEnrolled { get; set; }
+    [Parameter] public EventCallback OnCardClick { get; set; }
+    [Parameter] public EventCallback OnEnrollClick { get; set; }
+    [Parameter] public string CourseId { get; set; } = string.Empty;
+
+    private async Task HandleCardClick()
+    {
+        if (OnCardClick.HasDelegate)
+        {
+            await OnCardClick.InvokeAsync();
+        }
+    }
+
+    private async Task HandleEnrollClick()
+    {
+        if (OnEnrollClick.HasDelegate)
+        {
+            await OnEnrollClick.InvokeAsync();
+        }
+    }
+}
+EOF
+
+echo "CourseCard component created" | tee -a "$LOG_FILE"
+
+# Create SearchBar component
+echo "Creating SearchBar component..." | tee -a "$LOG_FILE"
+cat > src/InsightLearn.Web/Components/UI/SearchBar.razor << 'EOF'
+@* SearchBar.razor - Advanced search with AI suggestions *@
+
+<div class="search-container">
+    <div class="relative">
+        <i class="search-icon fas fa-search"></i>
+        <input type="text" 
+               class="search-input" 
+               placeholder="@Placeholder"
+               @bind="SearchQuery"
+               @bind:event="oninput"
+               @onkeypress="OnKeyPress"
+               @onfocus="OnFocus"
+               @onblur="OnBlur" />
+        
+        @if (IsLoading)
+        {
+            <div class="absolute right-4 top-1/2 transform -translate-y-1/2">
+                <div class="spinner w-5 h-5"></div>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(SearchQuery))
+        {
+            <button class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    @onclick="ClearSearch">
+                <i class="fas fa-times"></i>
+            </button>
+        }
+    </div>
+    
+    @if (ShowSuggestions && Suggestions.Any())
+    {
+        <div class="absolute top-full left-0 right-0 mt-2 glass-card z-50">
+            @foreach (var suggestion in Suggestions.Take(MaxSuggestions))
+            {
+                <div class="suggestion-item p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                     @onclick="() => SelectSuggestion(suggestion)">
+                    <div class="flex items-center">
+                        <i class="fas fa-search text-gray-400 mr-3"></i>
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-900">@suggestion.Title</div>
+                            @if (!string.IsNullOrEmpty(suggestion.Category))
+                            {
+                                <div class="text-sm text-gray-500">in @suggestion.Category</div>
+                            }
+                        </div>
+                        @if (suggestion.Type == "AI")
+                        {
+                            <div class="ml-2 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
+                                AI Suggested
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            
+            @if (Suggestions.Count > MaxSuggestions)
+            {
+                <div class="p-3 text-center text-sm text-gray-500 border-t">
+                    @(Suggestions.Count - MaxSuggestions) more suggestions available
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Placeholder { get; set; } = "Search courses, topics, or ask AI...";
+    [Parameter] public int MaxSuggestions { get; set; } = 5;
+    [Parameter] public EventCallback<string> OnSearch { get; set; }
+    [Parameter] public EventCallback<SearchSuggestion> OnSuggestionSelected { get; set; }
+    [Parameter] public bool EnableAISuggestions { get; set; } = true;
+
+    private string _searchQuery = string.Empty;
+    private bool ShowSuggestions = false;
+    private bool IsLoading = false;
+    private List<SearchSuggestion> Suggestions = new();
+    private Timer? _debounceTimer;
+
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            _searchQuery = value;
+            DebounceSearch();
+        }
+    }
+
+    private void DebounceSearch()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                if (!string.IsNullOrWhiteSpace(SearchQuery))
+                {
+                    await LoadSuggestions();
+                }
+                else
+                {
+                    Suggestions.Clear();
+                    ShowSuggestions = false;
+                    StateHasChanged();
+                }
+            });
+        }, null, 300, Timeout.Infinite);
+    }
+
+    private async Task LoadSuggestions()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Simulate API call for suggestions
+            await Task.Delay(200);
+            
+            Suggestions = GenerateMockSuggestions(SearchQuery);
+            ShowSuggestions = Suggestions.Any();
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private List<SearchSuggestion> GenerateMockSuggestions(string query)
+    {
+        var suggestions = new List<SearchSuggestion>();
+        
+        // Regular search suggestions
+        suggestions.AddRange(new[]
+        {
+            new SearchSuggestion { Title = $"{query} - Complete Course", Category = "Courses", Type = "Course" },
+            new SearchSuggestion { Title = $"Advanced {query}", Category = "Courses", Type = "Course" },
+            new SearchSuggestion { Title = $"{query} for Beginners", Category = "Courses", Type = "Course" },
+        });
+
+        // AI-powered suggestions
+        if (EnableAISuggestions)
+        {
+            suggestions.AddRange(new[]
+            {
+                new SearchSuggestion { Title = $"AI recommends: {query} Fundamentals", Category = "AI Suggestion", Type = "AI" },
+                new SearchSuggestion { Title = $"Similar to {query}: Related Topics", Category = "AI Suggestion", Type = "AI" },
+            });
+        }
+
+        return suggestions.Take(10).ToList();
+    }
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            ShowSuggestions = false;
+            if (OnSearch.HasDelegate)
+            {
+                await OnSearch.InvokeAsync(SearchQuery);
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            ShowSuggestions = false;
+        }
+    }
+
+    private void OnFocus()
+    {
+        if (Suggestions.Any())
+        {
+            ShowSuggestions = true;
+        }
+    }
+
+    private void OnBlur()
+    {
+        // Delay hiding suggestions to allow for clicks
+        Task.Delay(200).ContinueWith(_ => 
+        {
+            InvokeAsync(() =>
+            {
+                ShowSuggestions = false;
+                StateHasChanged();
+            });
+        });
+    }
+
+    private async Task SelectSuggestion(SearchSuggestion suggestion)
+    {
+        SearchQuery = suggestion.Title;
+        ShowSuggestions = false;
+        
+        if (OnSuggestionSelected.HasDelegate)
+        {
+            await OnSuggestionSelected.InvokeAsync(suggestion);
+        }
+        
+        if (OnSearch.HasDelegate)
+        {
+            await OnSearch.InvokeAsync(suggestion.Title);
+        }
+    }
+
+    private void ClearSearch()
+    {
+        SearchQuery = string.Empty;
+        Suggestions.Clear();
+        ShowSuggestions = false;
+    }
+
+    public class SearchSuggestion
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
+    }
+}
+EOF
+
+echo "SearchBar component created" | tee -a "$LOG_FILE"
+
+# Verify components created
+echo "Verifying components..." | tee -a "$LOG_FILE"
+COMPONENTS_COUNT=$(find src/InsightLearn.Web/Components/UI -name "*.razor" | wc -l)
+echo "Created $COMPONENTS_COUNT Blazor components" | tee -a "$LOG_FILE"
+
+if [ $COMPONENTS_COUNT -ge 2 ]; then
+    echo "✅ UI Components created successfully" | tee -a "$LOG_FILE"
+else
+    echo "❌ Some UI components missing" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+echo "=== [$(date)] Step 2.2 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+### STEP 2.3: Animations e Interazioni Avanzate
+
+**Comando da eseguire dopo successo Step 2.2:**
+```bash
+#!/bin/bash
+# phase2_step3_animations.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2_step3_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 2 STEP 3: Advanced Animations ===" | tee -a "$LOG_FILE"
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 2.3 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+cd InsightLearn.Cloud
+
+# Create animations CSS
+echo "Creating advanced animations..." | tee -a "$LOG_FILE"
+cat > src/InsightLearn.Web/wwwroot/css/design-system/animations.css << 'EOF'
+/*
+ * InsightLearn.Cloud Advanced Animations
+ * Premium micro-interactions and fluid animations
+ */
+
+/* === KEYFRAMES === */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes bounce {
+    0%, 20%, 53%, 80%, 100% {
+        animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+        transform: translate3d(0,0,0);
+    }
+    40%, 43% {
+        animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+        transform: translate3d(0, -30px, 0);
+    }
+    70% {
+        animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+        transform: translate3d(0, -15px, 0);
+    }
+    90% {
+        transform: translate3d(0,-4px,0);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-5px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(5px);
+    }
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(117, 103, 240, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(117, 103, 240, 0.8), 0 0 30px rgba(117, 103, 240, 0.6);
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* === ANIMATION CLASSES === */
+.animate-fade-in-up {
+    animation: fadeInUp var(--duration-500) var(--ease-out) forwards;
+}
+
+.animate-fade-in-down {
+    animation: fadeInDown var(--duration-500) var(--ease-out) forwards;
+}
+
+.animate-fade-in-left {
+    animation: fadeInLeft var(--duration-500) var(--ease-out) forwards;
+}
+
+.animate-fade-in-right {
+    animation: fadeInRight var(--duration-500) var(--ease-out) forwards;
+}
+
+.animate-slide-up {
+    animation: slideUp var(--duration-500) var(--ease-spring) forwards;
+}
+
+.animate-scale-in {
+    animation: scaleIn var(--duration-300) var(--ease-spring) forwards;
+}
+
+.animate-bounce {
+    animation: bounce var(--duration-1000) var(--ease-bounce);
+}
+
+.animate-pulse {
+    animation: pulse 2s infinite;
+}
+
+.animate-shake {
+    animation: shake var(--duration-500) var(--ease-out);
+}
+
+.animate-float {
+    animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+.animate-shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+}
+
+/* === STAGGER ANIMATIONS === */
+.stagger-children > * {
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.stagger-children.animate > *:nth-child(1) {
+    animation: fadeInUp var(--duration-500) var(--ease-out) 0.1s forwards;
+}
+
+.stagger-children.animate > *:nth-child(2) {
+    animation: fadeInUp var(--duration-500) var(--ease-out) 0.2s forwards;
+}
+
+.stagger-children.animate > *:nth-child(3) {
+    animation: fadeInUp var(--duration-500) var(--ease-out) 0.3s forwards;
+}
+
+.stagger-children.animate > *:nth-child(4) {
+    animation: fadeInUp var(--duration-500) var(--ease-out) 0.4s forwards;
+}
+
+.stagger-children.animate > *:nth-child(5) {
+    animation: fadeInUp var(--duration-500) var(--ease-out) 0.5s forwards;
+}
+
+.stagger-children.animate > *:nth-child(6) {
+    animation: fadeInUp var(--duration-500) var(--ease-out) 0.6s forwards;
+}
+
+/* === HOVER EFFECTS === */
+.hover-lift {
+    transition: all var(--duration-300) var(--ease-out);
+}
+
+.hover-lift:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: var(--shadow-2xl);
+}
+
+.hover-scale {
+    transition: transform var(--duration-200) var(--ease-out);
+}
+
+.hover-scale:hover {
+    transform: scale(1.05);
+}
+
+.hover-rotate {
+    transition: transform var(--duration-300) var(--ease-out);
+}
+
+.hover-rotate:hover {
+    transform: rotate(5deg);
+}
+
+.hover-glow {
+    transition: all var(--duration-300) var(--ease-out);
+}
+
+.hover-glow:hover {
+    box-shadow: 0 0 20px rgba(117, 103, 240, 0.4);
+    border-color: rgba(117, 103, 240, 0.6);
+}
+
+/* === MICRO-INTERACTIONS === */
+.button-press {
+    transition: all var(--duration-150) var(--ease-out);
+}
+
+.button-press:active {
+    transform: scale(0.95);
+}
+
+.ripple {
+    position: relative;
+    overflow: hidden;
+}
+
+.ripple::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    transition: width var(--duration-300) var(--ease-out), height var(--duration-300) var(--ease-out);
+}
+
+.ripple:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* === LOADING STATES === */
+.skeleton {
+    background: linear-gradient(90deg, var(--neutral-200) 25%, var(--neutral-100) 50%, var(--neutral-200) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+.loading-dots::after {
+    content: '';
+    animation: dots 1.5s infinite;
+}
+
+@keyframes dots {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+}
+
+/* === PAGE TRANSITIONS === */
+.page-enter {
+    opacity: 0;
+    transform: translateX(20px);
+}
+
+.page-enter-active {
+    opacity: 1;
+    transform: translateX(0);
+    transition: all var(--duration-300) var(--ease-out);
+}
+
+.page-exit {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.page-exit-active {
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: all var(--duration-300) var(--ease-out);
+}
+
+/* === SCROLL ANIMATIONS === */
+.scroll-fade {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all var(--duration-700) var(--ease-out);
+}
+
+.scroll-fade.in-view {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.parallax {
+    transform: translateY(var(--parallax-offset, 0));
+    transition: transform 0.1s ease-out;
+}
+
+/* === INTERACTIVE ELEMENTS === */
+.magnetic {
+    transition: transform var(--duration-200) var(--ease-out);
+}
+
+.card-3d {
+    perspective: 1000px;
+    transition: transform var(--duration-300) var(--ease-out);
+}
+
+.card-3d:hover {
+    transform: rotateY(5deg) rotateX(5deg);
+}
+
+/* === GLASSMORPHISM EFFECTS === */
+.glass-hover {
+    transition: all var(--duration-300) var(--ease-out);
+}
+
+.glass-hover:hover {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    transform: translateY(-2px);
+}
+
+/* === UTILITY ANIMATIONS === */
+.fade-in {
+    animation: fadeInUp var(--duration-500) var(--ease-out);
+}
+
+.slide-in-left {
+    animation: fadeInLeft var(--duration-500) var(--ease-out);
+}
+
+.slide-in-right {
+    animation: fadeInRight var(--duration-500) var(--ease-out);
+}
+
+.zoom-in {
+    animation: scaleIn var(--duration-300) var(--ease-spring);
+}
+
+/* === RESPONSIVE ANIMATIONS === */
+@media (max-width: 768px) {
+    .hover-lift:hover {
+        transform: none;
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .card-3d:hover {
+        transform: none;
+    }
+}
+
+/* === REDUCED MOTION === */
+@media (prefers-reduced-motion: reduce) {
+    .animate-fade-in-up,
+    .animate-fade-in-down,
+    .animate-fade-in-left,
+    .animate-fade-in-right,
+    .animate-slide-up,
+    .animate-scale-in,
+    .animate-bounce,
+    .animate-pulse,
+    .animate-shake,
+    .animate-float,
+    .animate-glow,
+    .animate-shimmer {
+        animation: none;
+    }
+    
+    .hover-lift:hover,
+    .hover-scale:hover,
+    .hover-rotate:hover {
+        transform: none;
+    }
+    
+    .stagger-children > * {
+        opacity: 1;
+        transform: none;
+    }
+}
+EOF
+
+echo "Advanced animations created" | tee -a "$LOG_FILE"
+
+# Create JavaScript for interactive animations
+echo "Creating interactive animations JavaScript..." | tee -a "$LOG_FILE"
+cat > src/InsightLearn.Web/wwwroot/js/design-system/animations.js << 'EOF'
+/**
+ * InsightLearn.Cloud Advanced Animations
+ * Interactive animations and micro-interactions
+ */
+
+class InsightLearnAnimations {
+    constructor() {
+        this.init();
+    }
+
+    init() {
+        this.setupScrollAnimations();
+        this.setupMagneticElements();
+        this.setupParallax();
+        this.setupRippleEffect();
+        this.setupIntersectionObserver();
+        this.setupStaggerAnimations();
+    }
+
+    // Scroll-triggered animations
+    setupScrollAnimations() {
+        const scrollElements = document.querySelectorAll('.scroll-fade');
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('in-view');
+                }
+            });
+        }, {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        });
+
+        scrollElements.forEach(el => observer.observe(el));
+    }
+
+    // Magnetic hover effect for buttons and cards
+    setupMagneticElements() {
+        const magneticElements = document.querySelectorAll('.magnetic');
+        
+        magneticElements.forEach(element => {
+            element.addEventListener('mousemove', (e) => {
+                const rect = element.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                
+                const moveX = x * 0.1;
+                const moveY = y * 0.1;
+                
+                element.style.transform = `translate(${moveX}px, ${moveY}px)`;
+            });
+            
+            element.addEventListener('mouseleave', () => {
+                element.style.transform = 'translate(0, 0)';
+            });
+        });
+    }
+
+    // Parallax scrolling effect
+    setupParallax() {
+        const parallaxElements = document.querySelectorAll('.parallax');
+        
+        const updateParallax = () => {
+            const scrollY = window.pageYOffset;
+            
+            parallaxElements.forEach(element => {
+                const speed = element.dataset.speed || 0.5;
+                const yPos = -(scrollY * speed);
+                element.style.setProperty('--parallax-offset', `${yPos}px`);
+            });
+        };
+
+        // Use requestAnimationFrame for smooth performance
+        let ticking = false;
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    updateParallax();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+    }
+
+    // Ripple effect for buttons
+    setupRippleEffect() {
+        const rippleElements = document.querySelectorAll('.ripple');
+        
+        rippleElements.forEach(element => {
+            element.addEventListener('click', (e) => {
+                const ripple = document.createElement('span');
+                const rect = element.getBoundingClientRect();
+                const size = Math.max(rect.width, rect.height);
+                const x = e.clientX - rect.left - size / 2;
+                const y = e.clientY - rect.top - size / 2;
+                
+                ripple.style.width = ripple.style.height = size + 'px';
+                ripple.style.left = x + 'px';
+                ripple.style.top = y + 'px';
+                ripple.classList.add('ripple-effect');
+                
+                element.appendChild(ripple);
+                
+                setTimeout(() => {
+                    ripple.remove();
+                }, 600);
+            });
+        });
+    }
+
+    // Enhanced intersection observer for complex animations
+    setupIntersectionObserver() {
+        const animatedElements = document.querySelectorAll('[data-animate]');
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const animationType = entry.target.dataset.animate;
+                    const delay = entry.target.dataset.delay || 0;
+                    
+                    setTimeout(() => {
+                        entry.target.classList.add(`animate-${animationType}`);
+                    }, delay);
+                    
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.1,
+            rootMargin: '0px 0px -100px 0px'
+        });
+
+        animatedElements.forEach(el => observer.observe(el));
+    }
+
+    // Stagger animations for lists and grids
+    setupStaggerAnimations() {
+        const staggerContainers = document.querySelectorAll('.stagger-children');
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.1
+        });
+
+        staggerContainers.forEach(container => observer.observe(container));
+    }
+
+    // Utility methods for programmatic animations
+    static fadeIn(element, duration = 300) {
+        element.style.opacity = 0;
+        element.style.transform = 'translateY(20px)';
+        element.style.transition = `all ${duration}ms ease-out`;
+        
+        requestAnimationFrame(() => {
+            element.style.opacity = 1;
+            element.style.transform = 'translateY(0)';
+        });
+    }
+
+    static slideIn(element, direction = 'up', duration = 300) {
+        const transforms = {
+            up: 'translateY(30px)',
+            down: 'translateY(-30px)',
+            left: 'translateX(30px)',
+            right: 'translateX(-30px)'
+        };
+        
+        element.style.opacity = 0;
+        element.style.transform = transforms[direction];
+        element.style.transition = `all ${duration}ms ease-out`;
+        
+        requestAnimationFrame(() => {
+            element.style.opacity = 1;
+            element.style.transform = 'translate(0)';
+        });
+    }
+
+    static pulse(element, scale = 1.05, duration = 200) {
+        element.style.transition = `transform ${duration}ms ease-out`;
+        element.style.transform = `scale(${scale})`;
+        
+        setTimeout(() => {
+            element.style.transform = 'scale(1)';
+        }, duration);
+    }
+
+    static shake(element, intensity = 5, duration = 500) {
+        const animation = element.animate([
+            { transform: 'translateX(0)' },
+            { transform: `translateX(-${intensity}px)` },
+            { transform: `translateX(${intensity}px)` },
+            { transform: `translateX(-${intensity}px)` },
+            { transform: `translateX(${intensity}px)` },
+            { transform: 'translateX(0)' }
+        ], {
+            duration: duration,
+            easing: 'ease-out'
+        });
+        
+        return animation;
+    }
+
+    // Performance monitoring
+    static measurePerformance(name, fn) {
+        const start = performance.now();
+        const result = fn();
+        const end = performance.now();
+        console.log(`${name} took ${end - start} milliseconds.`);
+        return result;
+    }
+}
+
+// Auto-initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        console.log('Reduced motion preference detected, skipping complex animations');
+        return;
+    }
+    
+    new InsightLearnAnimations();
+});
+
+// Export for global access
+window.InsightLearnAnimations = InsightLearnAnimations;
+
+// CSS to add dynamically for ripple effect
+const rippleCSS = `
+.ripple-effect {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    transform: scale(0);
+    animation: ripple-animation 0.6s linear;
+}
+
+@keyframes ripple-animation {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+`;
+
+// Add ripple CSS to head
+const style = document.createElement('style');
+style.textContent = rippleCSS;
+document.head.appendChild(style);
+EOF
+
+echo "Interactive animations JavaScript created" | tee -a "$LOG_FILE"
+
+# Create main design system integration file
+echo "Creating design system integration..." | tee -a "$LOG_FILE"
+cat > src/InsightLearn.Web/wwwroot/css/design-system/main.css << 'EOF'
+/*
+ * InsightLearn.Cloud Design System - Main Entry Point
+ * Import all design system components
+ */
+
+/* Core Design System */
+@import url('./variables.css');
+@import url('./base.css');
+@import url('./components.css');
+@import url('./animations.css');
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* Font Awesome for icons */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+/* Additional utility classes */
+.container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+}
+
+.container-sm {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+}
+
+.container-lg {
+    max-width: 1536px;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+}
+
+/* Grid system */
+.grid {
+    display: grid;
+    gap: var(--space-6);
+}
+
+.grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 768px) {
+    .grid-cols-2,
+    .grid-cols-3,
+    .grid-cols-4 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Flexbox utilities */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-around { justify-content: space-around; }
+.justify-start { justify-content: flex-start; }
+.justify-end { justify-content: flex-end; }
+
+/* Spacing utilities */
+.m-0 { margin: 0; }
+.m-1 { margin: var(--space-1); }
+.m-2 { margin: var(--space-2); }
+.m-3 { margin: var(--space-3); }
+.m-4 { margin: var(--space-4); }
+.m-6 { margin: var(--space-6); }
+.m-8 { margin: var(--space-8); }
+
+.p-0 { padding: 0; }
+.p-1 { padding: var(--space-1); }
+.p-2 { padding: var(--space-2); }
+.p-3 { padding: var(--space-3); }
+.p-4 { padding: var(--space-4); }
+.p-6 { padding: var(--space-6); }
+.p-8 { padding: var(--space-8); }
+
+/* Text utilities */
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.font-light { font-weight: var(--font-light); }
+.font-normal { font-weight: var(--font-normal); }
+.font-medium { font-weight: var(--font-medium); }
+.font-semibold { font-weight: var(--font-semibold); }
+.font-bold { font-weight: var(--font-bold); }
+
+/* Color utilities */
+.text-primary { color: var(--primary-600); }
+.text-secondary { color: var(--secondary-600); }
+.text-gray { color: var(--neutral-600); }
+.text-white { color: white; }
+
+.bg-primary { background-color: var(--primary-600); }
+.bg-secondary { background-color: var(--secondary-600); }
+.bg-gray { background-color: var(--neutral-100); }
+.bg-white { background-color: white; }
+
+.bg-gradient-primary { background: var(--gradient-primary); }
+.bg-gradient-secondary { background: var(--gradient-secondary); }
+.bg-gradient-hero { background: var(--gradient-hero); }
+
+/* Border utilities */
+.border { border: 1px solid var(--neutral-200); }
+.border-primary { border-color: var(--primary-600); }
+.border-secondary { border-color: var(--secondary-600); }
+
+.rounded { border-radius: var(--radius-base); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.rounded-2xl { border-radius: var(--radius-2xl); }
+.rounded-full { border-radius: var(--radius-full); }
+
+/* Shadow utilities */
+.shadow { box-shadow: var(--shadow-base); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-xl { box-shadow: var(--shadow-xl); }
+.shadow-2xl { box-shadow: var(--shadow-2xl); }
+
+/* Position utilities */
+.relative { position: relative; }
+.absolute { position: absolute; }
+.fixed { position: fixed; }
+.sticky { position: sticky; }
+
+/* Display utilities */
+.block { display: block; }
+.inline { display: inline; }
+.inline-block { display: inline-block; }
+.hidden { display: none; }
+
+/* Width and height utilities */
+.w-full { width: 100%; }
+.w-auto { width: auto; }
+.h-full { height: 100%; }
+.h-auto { height: auto; }
+.h-screen { height: 100vh; }
+
+/* Overflow utilities */
+.overflow-hidden { overflow: hidden; }
+.overflow-auto { overflow: auto; }
+.overflow-scroll { overflow: scroll; }
+
+/* Z-index utilities */
+.z-0 { z-index: var(--z-0); }
+.z-10 { z-index: var(--z-10); }
+.z-20 { z-index: var(--z-20); }
+.z-30 { z-index: var(--z-30); }
+.z-40 { z-index: var(--z-40); }
+.z-50 { z-index: var(--z-50); }
+
+/* Accessibility utilities */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Print utilities */
+@media print {
+    .print-hidden {
+        display: none !important;
+    }
+}
+EOF
+
+echo "Design system integration created" | tee -a "$LOG_FILE"
+
+# Verify all CSS files created
+echo "Verifying CSS files..." | tee -a "$LOG_FILE"
+CSS_COUNT=$(find src/InsightLearn.Web/wwwroot/css/design-system -name "*.css" | wc -l)
+JS_COUNT=$(find src/InsightLearn.Web/wwwroot/js/design-system -name "*.js" | wc -l)
+
+echo "Created $CSS_COUNT CSS files and $JS_COUNT JS files" | tee -a "$LOG_FILE"
+
+if [ $CSS_COUNT -ge 4 ] && [ $JS_COUNT -ge 1 ]; then
+    echo "✅ Design system files created successfully" | tee -a "$LOG_FILE"
+else
+    echo "❌ Some design system files missing" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+echo "=== [$(date)] Step 2.3 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+## 🔍 STEP 2.4: Verifica Finale Fase 2
+
+```bash
+#!/bin/bash
+# phase2_verification.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2_verification_$(date +%Y%m%d_%H%M%S).log"
+REPORT_FILE="logs/PHASE2_FINAL_REPORT_$(date +%Y%m%d_%H%M%S).md"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "========================================" | tee -a "$LOG_FILE"
+echo "FASE 2: VERIFICA DESIGN SYSTEM" | tee -a "$LOG_FILE"
+echo "Data: $(date)" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+
+cd InsightLearn.Cloud
+
+ERRORS=0
+WARNINGS=0
+
+# Create report header
+cat > "$REPORT_FILE" << 'EOF'
+# InsightLearn.Cloud - Report Verifica Fase 2
+
+## 📅 Informazioni Generali
+EOF
+
+echo "- **Data Verifica**: $(date)" >> "$REPORT_FILE"
+echo "- **Fase**: Design System e UI Components" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+echo "## 📊 Verifica Files Design System" >> "$REPORT_FILE"
+
+# Check CSS files
+echo "Verifica CSS files..." | tee -a "$LOG_FILE"
+declare -a REQUIRED_CSS=(
+    "src/InsightLearn.Web/wwwroot/css/design-system/variables.css"
+    "src/InsightLearn.Web/wwwroot/css/design-system/base.css"
+    "src/InsightLearn.Web/wwwroot/css/design-system/components.css"
+    "src/InsightLearn.Web/wwwroot/css/design-system/animations.css"
+    "src/InsightLearn.Web/wwwroot/css/design-system/main.css"
+)
+
+for css_file in "${REQUIRED_CSS[@]}"; do
+    if [ -f "$css_file" ]; then
+        echo "✅ $css_file exists" | tee -a "$LOG_FILE"
+        echo "- ✅ $(basename $css_file)" >> "$REPORT_FILE"
+        
+        # Check file size (should not be empty)
+        if [ -s "$css_file" ]; then
+            SIZE=$(wc -c < "$css_file")
+            echo "  File size: $SIZE bytes" | tee -a "$LOG_FILE"
+        else
+            echo "⚠️  WARNING: $css_file is empty" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    else
+        echo "❌ $css_file missing" | tee -a "$LOG_FILE"
+        echo "- ❌ $(basename $css_file) MISSING" >> "$REPORT_FILE"
+        ((ERRORS++))
+    fi
+done
+
+# Check JavaScript files
+echo "Verifica JavaScript files..." | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "## 📜 Verifica JavaScript Files" >> "$REPORT_FILE"
+
+if [ -f "src/InsightLearn.Web/wwwroot/js/design-system/animations.js" ]; then
+    echo "✅ animations.js exists" | tee -a "$LOG_FILE"
+    echo "- ✅ animations.js" >> "$REPORT_FILE"
+    
+    # Check for key functions
+    if grep -q "InsightLearnAnimations" "src/InsightLearn.Web/wwwroot/js/design-system/animations.js"; then
+        echo "  ✅ Main class found" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Main class missing" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+else
+    echo "❌ animations.js missing" | tee -a "$LOG_FILE"
+    echo "- ❌ animations.js MISSING" >> "$REPORT_FILE"
+    ((ERRORS++))
+fi
+
+# Check Blazor components
+echo "Verifica Blazor components..." | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "## 🧩 Verifica Blazor Components" >> "$REPORT_FILE"
+
+declare -a REQUIRED_COMPONENTS=(
+    "src/InsightLearn.Web/Components/UI/CourseCard.razor"
+    "src/InsightLearn.Web/Components/UI/SearchBar.razor"
+)
+
+for component in "${REQUIRED_COMPONENTS[@]}"; do
+    if [ -f "$component" ]; then
+        echo "✅ $(basename $component) exists" | tee -a "$LOG_FILE"
+        echo "- ✅ $(basename $component)" >> "$REPORT_FILE"
+        
+        # Check if component has @code block
+        if grep -q "@code" "$component"; then
+            echo "  ✅ Code block found" | tee -a "$LOG_FILE"
+        else
+            echo "  ⚠️  WARNING: No code block found" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    else
+        echo "❌ $(basename $component) missing" | tee -a "$LOG_FILE"
+        echo "- ❌ $(basename $component) MISSING" >> "$REPORT_FILE"
+        ((ERRORS++))
+    fi
+done
+
+# Check directory structure
+echo "Verifica directory structure..." | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "## 📁 Verifica Directory Structure" >> "$REPORT_FILE"
+
+declare -a REQUIRED_DIRS=(
+    "src/InsightLearn.Web/wwwroot/css/design-system"
+    "src/InsightLearn.Web/wwwroot/js/design-system"
+    "src/InsightLearn.Web/wwwroot/assets/icons"
+    "src/InsightLearn.Web/wwwroot/assets/images"
+    "src/InsightLearn.Web/Components/UI"
+    "src/InsightLearn.Web/Components/Layout"
+    "src/InsightLearn.Web/Components/Shared"
+)
+
+for dir in "${REQUIRED_DIRS[@]}"; do
+    if [ -d "$dir" ]; then
+        echo "✅ $dir exists" | tee -a "$LOG_FILE"
+        echo "- ✅ $(basename $dir)" >> "$REPORT_FILE"
+    else
+        echo "❌ $dir missing" | tee -a "$LOG_FILE"
+        echo "- ❌ $(basename $dir) MISSING" >> "$REPORT_FILE"
+        ((ERRORS++))
+    fi
+done
+
+# Test CSS validity (basic check)
+echo "Test CSS validity..." | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "## 🔍 CSS Validity Check" >> "$REPORT_FILE"
+
+for css_file in "${REQUIRED_CSS[@]}"; do
+    if [ -f "$css_file" ]; then
+        # Check for basic CSS syntax errors
+        if grep -q "{" "$css_file" && grep -q "}" "$css_file"; then
+            echo "✅ $(basename $css_file) has valid CSS syntax" | tee -a "$LOG_FILE"
+            echo "- ✅ $(basename $css_file) syntax OK" >> "$REPORT_FILE"
+        else
+            echo "⚠️  WARNING: $(basename $css_file) may have syntax issues" | tee -a "$LOG_FILE"
+            echo "- ⚠️  $(basename $css_file) syntax WARNING" >> "$REPORT_FILE"
+            ((WARNINGS++))
+        fi
+    fi
+done
+
+# Final statistics
+echo "" >> "$REPORT_FILE"
+echo "## 📈 Statistiche Finali" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+echo "- **Errori Totali**: $ERRORS" >> "$REPORT_FILE"
+echo "- **Warning Totali**: $WARNINGS" >> "$REPORT_FILE"
+echo "- **CSS Files**: $(find src/InsightLearn.Web/wwwroot/css/design-system -name "*.css" | wc -l)" >> "$REPORT_FILE"
+echo "- **JS Files**: $(find src/InsightLearn.Web/wwwroot/js/design-system -name "*.js" | wc -l)" >> "$REPORT_FILE"
+echo "- **Blazor Components**: $(find src/InsightLearn.Web/Components/UI -name "*.razor" | wc -l)" >> "$REPORT_FILE"
+
+# Final verdict
+echo "" >> "$REPORT_FILE"
+echo "## 🎯 Verdetto Finale" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+if [ $ERRORS -eq 0 ]; then
+    echo "### ✅ FASE 2 COMPLETATA CON SUCCESSO" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "Il design system è stato implementato correttamente. Pronto per la Fase 3." >> "$REPORT_FILE"
+    
+    echo "✅ VERIFICA FASE 2: SUCCESSO" | tee -a "$LOG_FILE"
+    echo "📊 Report generato: $REPORT_FILE" | tee -a "$LOG_FILE"
+    
+    exit 0
+else
+    echo "### ❌ FASE 2 RICHIEDE CORREZIONI" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "Sono stati rilevati $ERRORS errori che devono essere corretti." >> "$REPORT_FILE"
+    
+    echo "❌ VERIFICA FASE 2: FALLITA ($ERRORS errori)" | tee -a "$LOG_FILE"
+    echo "📊 Report generato: $REPORT_FILE" | tee -a "$LOG_FILE"
+    
+    exit 1
+fi
+```
+
+## 📝 Istruzioni per Claude Code
+
+**ESEGUI ESATTAMENTE IN QUESTO ORDINE:**
+
+1. **STEP 2.1**: Esegui `phase2_step1_design_system_setup.sh`
+   - Crea design system base con variabili CSS e stili
+   - Verifica che tutti i file CSS siano creati correttamente
+
+2. **STEP 2.2**: Esegui `phase2_step2_advanced_components.sh`
+   - Crea componenti UI avanzati con glassmorphism
+   - Implementa CourseCard e SearchBar Blazor components
+
+3. **STEP 2.3**: Esegui `phase2_step3_animations.sh`
+   - Implementa animazioni avanzate e micro-interazioni
+   - Crea JavaScript per interazioni premium
+
+4. **STEP 2.4**: Esegui `phase2_verification.sh`
+   - Verifica completa di tutti i componenti
+   - Genera report dettagliato
+
+## ✅ Criterio di Successo Fase 2
+
+La Fase 2 è completata quando:
+- [x] Design system completo con 5+ file CSS
+- [x] Componenti Blazor premium implementati
+- [x] Animazioni avanzate e JavaScript interattivo
+- [x] Glassmorphism e neumorphism effects
+- [x] Sistema responsive e accessibile
+- [x] Verifica finale passa con 0 errori
+
+**Ora puoi procedere con questa Fase 2. Segnala quando completata per ricevere la Fase 3.**

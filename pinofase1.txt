@@ -1,0 +1,441 @@
+# Prompt per Claude Code - Fase 1: Setup Infrastruttura Base InsightLearn.Cloud
+
+## 🎯 Obiettivo della Fase
+Eseguire il setup completo dell'infrastruttura base per InsightLearn.Cloud seguendo esattamente le specifiche del piano master. Ogni comando deve essere loggato, verificato e auto-corretto in caso di errori.
+
+## ⚙️ Configurazioni Operative
+
+### Sistema di Logging e Error Handling
+- **OBBLIGATORIO**: Ogni comando bash deve generare un log dettagliato
+- **TIMEOUT**: Tutti i comandi hanno timeout di 10 minuti
+- **AUTO-RECOVERY**: Se un comando fallisce, devi rigenerarlo con correzioni
+- **VERIFICA**: Ogni step deve essere verificato prima di procedere al successivo
+
+### Template di Esecuzione per Ogni Comando
+```bash
+#!/bin/bash
+set -e  # Exit on error
+set -u  # Exit on undefined variable
+
+# Setup logging
+LOG_FILE="logs/phase1_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE" >&2)
+
+echo "=== [$(date)] Starting command: $0 ===" | tee -a "$LOG_FILE"
+
+# Timeout function
+timeout_cmd() {
+    timeout 600 "$@"  # 10 minutes timeout
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+# Error handling function
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Command failed ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+# Your actual commands go here with timeout_cmd wrapper
+```
+
+## 📋 FASE 1: Setup Infrastruttura Base
+
+### STEP 1.1: Inizializzazione Progetto
+
+**Comando da eseguire:**
+```bash
+#!/bin/bash
+# phase1_step1_project_init.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase1_step1_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 1 STEP 1: Project Initialization ===" | tee -a "$LOG_FILE"
+
+timeout_cmd() {
+    timeout 600 "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 1.1 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+# Create main project directory
+echo "Creating main project directory..." | tee -a "$LOG_FILE"
+timeout_cmd mkdir -p InsightLearn.Cloud
+cd InsightLearn.Cloud
+echo "Current directory: $(pwd)" | tee -a "$LOG_FILE"
+
+# Initialize solution
+echo "Creating .NET solution..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet new sln -n InsightLearn.Cloud
+echo "Solution created successfully" | tee -a "$LOG_FILE"
+
+# Create source directories
+echo "Creating source project directories..." | tee -a "$LOG_FILE"
+timeout_cmd mkdir -p src/InsightLearn.Web
+timeout_cmd mkdir -p src/InsightLearn.Api  
+timeout_cmd mkdir -p src/InsightLearn.Core
+timeout_cmd mkdir -p src/InsightLearn.Infrastructure
+timeout_cmd mkdir -p src/InsightLearn.AI
+echo "Source directories created" | tee -a "$LOG_FILE"
+
+# Create infrastructure directories
+echo "Creating infrastructure directories..." | tee -a "$LOG_FILE"
+timeout_cmd mkdir -p kubernetes/configmaps
+timeout_cmd mkdir -p kubernetes/secrets
+timeout_cmd mkdir -p kubernetes/deployments
+timeout_cmd mkdir -p kubernetes/services
+timeout_cmd mkdir -p docker
+timeout_cmd mkdir -p scripts
+timeout_cmd mkdir -p docs
+echo "Infrastructure directories created" | tee -a "$LOG_FILE"
+
+# Verify structure
+echo "Verifying directory structure..." | tee -a "$LOG_FILE"
+tree -L 3 . | tee -a "$LOG_FILE" || ls -la | tee -a "$LOG_FILE"
+
+echo "=== [$(date)] Step 1.1 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+**ISTRUZIONI PER CLAUDE CODE:**
+1. Esegui il comando sopra
+2. Se fallisce, analizza l'errore dal log
+3. Correggi il comando e rieseguilo
+4. Non procedere al prossimo step fino a verifica completa
+
+### STEP 1.2: Setup Blazor Hybrid Application
+
+**Comando da eseguire dopo successo Step 1.1:**
+```bash
+#!/bin/bash
+# phase1_step2_blazor_setup.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase1_step2_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 1 STEP 2: Blazor Setup ===" | tee -a "$LOG_FILE"
+
+timeout_cmd() {
+    timeout 600 "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 1.2 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+# Navigate to project root
+cd InsightLearn.Cloud/src/InsightLearn.Web
+echo "Current directory: $(pwd)" | tee -a "$LOG_FILE"
+
+# Create Blazor project
+echo "Creating Blazor project with Auto interactivity..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet new blazor --interactivity Auto --all-interactive false --auth None --name InsightLearn.Web
+echo "Blazor project created" | tee -a "$LOG_FILE"
+
+# Add required packages
+echo "Adding authentication packages..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
+timeout_cmd dotnet add package Microsoft.AspNetCore.Authentication.Google
+echo "Authentication packages added" | tee -a "$LOG_FILE"
+
+echo "Adding caching and UI packages..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet add package Microsoft.Extensions.Caching.Redis
+timeout_cmd dotnet add package MudBlazor
+echo "Caching and UI packages added" | tee -a "$LOG_FILE"
+
+# Add to solution
+echo "Adding project to solution..." | tee -a "$LOG_FILE"
+cd ../../
+timeout_cmd dotnet sln add src/InsightLearn.Web/InsightLearn.Web.csproj
+echo "Project added to solution" | tee -a "$LOG_FILE"
+
+# Verify project
+echo "Verifying project structure..." | tee -a "$LOG_FILE"
+ls -la src/InsightLearn.Web/ | tee -a "$LOG_FILE"
+
+echo "=== [$(date)] Step 1.2 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+### STEP 1.3: Setup Web API Backend
+
+**Comando da eseguire dopo successo Step 1.2:**
+```bash
+#!/bin/bash
+# phase1_step3_api_setup.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase1_step3_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 1 STEP 3: Web API Setup ===" | tee -a "$LOG_FILE"
+
+timeout_cmd() {
+    timeout 600 "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 1.3 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+# Navigate to API directory
+cd InsightLearn.Cloud/src/InsightLearn.Api
+echo "Current directory: $(pwd)" | tee -a "$LOG_FILE"
+
+# Create Web API project
+echo "Creating Web API project..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet new webapi --use-controllers --name InsightLearn.Api
+echo "Web API project created" | tee -a "$LOG_FILE"
+
+# Add database packages
+echo "Adding Entity Framework SQL Server package..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet add package Microsoft.EntityFrameworkCore.SqlServer
+timeout_cmd dotnet add package Microsoft.EntityFrameworkCore.Design
+echo "SQL Server packages added" | tee -a "$LOG_FILE"
+
+echo "Adding MongoDB driver..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet add package MongoDB.Driver
+echo "MongoDB driver added" | tee -a "$LOG_FILE"
+
+echo "Adding caching and search packages..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet add package StackExchange.Redis
+timeout_cmd dotnet add package Elasticsearch.Net
+echo "Cache and search packages added" | tee -a "$LOG_FILE"
+
+echo "Adding API documentation..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet add package Swashbuckle.AspNetCore
+echo "Swagger documentation added" | tee -a "$LOG_FILE"
+
+# Add to solution
+echo "Adding API project to solution..." | tee -a "$LOG_FILE"
+cd ../../
+timeout_cmd dotnet sln add src/InsightLearn.Api/InsightLearn.Api.csproj
+echo "API project added to solution" | tee -a "$LOG_FILE"
+
+# Verify project
+echo "Verifying API project..." | tee -a "$LOG_FILE"
+ls -la src/InsightLearn.Api/ | tee -a "$LOG_FILE"
+
+echo "=== [$(date)] Step 1.3 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+### STEP 1.4: Setup Core e Infrastructure Projects
+
+**Comando da eseguire dopo successo Step 1.3:**
+```bash
+#!/bin/bash
+# phase1_step4_core_infrastructure.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase1_step4_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 1 STEP 4: Core & Infrastructure Setup ===" | tee -a "$LOG_FILE"
+
+timeout_cmd() {
+    timeout 600 "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 1.4 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+cd InsightLearn.Cloud
+
+# Create Core library
+echo "Creating Core library..." | tee -a "$LOG_FILE"
+cd src/InsightLearn.Core
+timeout_cmd dotnet new classlib --name InsightLearn.Core
+echo "Core library created" | tee -a "$LOG_FILE"
+
+# Create Infrastructure library
+echo "Creating Infrastructure library..." | tee -a "$LOG_FILE"
+cd ../InsightLearn.Infrastructure
+timeout_cmd dotnet new classlib --name InsightLearn.Infrastructure
+echo "Infrastructure library created" | tee -a "$LOG_FILE"
+
+# Create AI library
+echo "Creating AI library..." | tee -a "$LOG_FILE"
+cd ../InsightLearn.AI
+timeout_cmd dotnet new classlib --name InsightLearn.AI
+timeout_cmd dotnet add package RestSharp
+timeout_cmd dotnet add package Newtonsoft.Json
+echo "AI library created with packages" | tee -a "$LOG_FILE"
+
+# Add all projects to solution
+echo "Adding all projects to solution..." | tee -a "$LOG_FILE"
+cd ../../
+timeout_cmd dotnet sln add src/InsightLearn.Core/InsightLearn.Core.csproj
+timeout_cmd dotnet sln add src/InsightLearn.Infrastructure/InsightLearn.Infrastructure.csproj
+timeout_cmd dotnet sln add src/InsightLearn.AI/InsightLearn.AI.csproj
+echo "All projects added to solution" | tee -a "$LOG_FILE"
+
+# Build solution to verify everything works
+echo "Building entire solution..." | tee -a "$LOG_FILE"
+timeout_cmd dotnet build
+echo "Solution built successfully" | tee -a "$LOG_FILE"
+
+# Final verification
+echo "Final project structure:" | tee -a "$LOG_FILE"
+tree . -L 3 | tee -a "$LOG_FILE" || find . -type d -maxdepth 3 | tee -a "$LOG_FILE"
+
+echo "=== [$(date)] Step 1.4 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+echo "=== [$(date)] PHASE 1 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+## 🔍 Verifica Finale Fase 1
+
+**Comando di verifica completa:**
+```bash
+#!/bin/bash
+# phase1_final_verification.sh
+
+LOG_FILE="logs/phase1_verification_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 1 FINAL VERIFICATION ===" | tee -a "$LOG_FILE"
+
+cd InsightLearn.Cloud
+
+echo "1. Verifying solution structure..." | tee -a "$LOG_FILE"
+dotnet sln list | tee -a "$LOG_FILE"
+
+echo "2. Verifying all projects build..." | tee -a "$LOG_FILE"
+dotnet build | tee -a "$LOG_FILE"
+
+echo "3. Verifying directory structure..." | tee -a "$LOG_FILE"
+find . -type d | sort | tee -a "$LOG_FILE"
+
+echo "4. Verifying package references..." | tee -a "$LOG_FILE"
+find . -name "*.csproj" -exec echo "=== {} ===" \; -exec cat {} \; | tee -a "$LOG_FILE"
+
+echo "=== [$(date)] PHASE 1 VERIFICATION COMPLETED ===" | tee -a "$LOG_FILE"
+```
+
+## 📝 Istruzioni per Claude Code
+
+**ESEGUI ESATTAMENTE IN QUESTO ORDINE:**
+
+1. **STEP 1.1**: Esegui `phase1_step1_project_init.sh`
+   - Verifica successo dal log
+   - Se fallisce, analizza errore e correggi
+   - Non procedere fino a successo completo
+
+2. **STEP 1.2**: Esegui `phase1_step2_blazor_setup.sh` 
+   - Verifica successo dal log
+   - Se fallisce, analizza errore e correggi
+   - Non procedere fino a successo completo
+
+3. **STEP 1.3**: Esegui `phase1_step3_api_setup.sh`
+   - Verifica successo dal log  
+   - Se fallisce, analizza errore e correggi
+   - Non procedere fino a successo completo
+
+4. **STEP 1.4**: Esegui `phase1_step4_core_infrastructure.sh`
+   - Verifica successo dal log
+   - Se fallisce, analizza errore e correggi
+   - Non procedere fino a successo completo
+
+5. **VERIFICA FINALE**: Esegui `phase1_final_verification.sh`
+   - Controlla che tutto sia corretto
+   - Se fallisce, identifica e correggi problemi
+
+## ⚠️ Regole di Error Handling
+
+1. **OGNI comando deve essere wrappato con timeout di 10 minuti**
+2. **OGNI errore deve essere loggato con timestamp e dettagli**
+3. **Se un comando fallisce, DEVI rigenerarlo con correzioni**
+4. **Non procedere mai al prossimo step se il precedente non è completato**
+5. **I log devono essere conservati per debug**
+
+## ✅ Criterio di Successo Fase 1
+
+La Fase 1 è completata con successo quando:
+- [x] Struttura progetto InsightLearn.Cloud creata
+- [x] Tutti e 5 i progetti .NET creati e configurati
+- [x] Tutti i package NuGet installati correttamente
+- [x] Solution compila senza errori
+- [x] Struttura directory kubernetes/docker/scripts creata
+- [x] Tutti i log mostrano successo
+- [x] Verifica finale passa completamente
+
+**Ora puoi procedere con questa Fase 1. Segnala quando completata per ricevere la Fase 2.**

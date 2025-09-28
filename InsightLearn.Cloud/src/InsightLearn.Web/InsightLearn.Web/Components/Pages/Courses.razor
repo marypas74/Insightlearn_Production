@@ -1,0 +1,312 @@
+@page "/courses"
+@page "/courses/{category}"
+@using InsightLearn.Web.Components.UI
+
+<PageTitle>@GetPageTitle() | InsightLearn</PageTitle>
+
+<div style="background: var(--neutral-50); min-height: 100vh;">
+    <!-- Breadcrumb and Header -->
+    <section style="background: var(--neutral-800); padding: 24px 0;">
+        <div class="udemy-container">
+            <div style="color: #fff;">
+                <div style="font-size: 14px; color: var(--neutral-300); margin-bottom: 8px;">
+                    <a href="/" style="color: var(--udemy-purple); text-decoration: none;">Home</a>
+                    @if (!string.IsNullOrEmpty(Category))
+                    {
+                        <span> > </span>
+                        <span>@GetCategoryDisplayName(Category)</span>
+                    }
+                    else
+                    {
+                        <span> > All Courses</span>
+                    }
+                </div>
+                <h1 style="font-size: 32px; font-weight: 700; color: #fff; margin: 0;">
+                    @GetPageTitle()
+                </h1>
+            </div>
+        </div>
+    </section>
+
+    <!-- Filters and Results -->
+    <div class="udemy-container" style="padding: 24px;">
+        <div style="display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: start;">
+
+            <!-- Sidebar Filters -->
+            <aside style="background: #fff; border-radius: 4px; padding: 16px; height: fit-content; border: 1px solid var(--neutral-200);">
+                <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--neutral-900);">Filter</h3>
+
+                <!-- Price Filter -->
+                <div style="margin-bottom: 24px;">
+                    <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--neutral-700);">Price</h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="FilterFree" @oninput="ApplyFilters" />
+                            <span>Free</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="FilterPaid" @oninput="ApplyFilters" />
+                            <span>Paid</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Rating Filter -->
+                <div style="margin-bottom: 24px;">
+                    <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--neutral-700);">Rating</h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="Filter4Plus" @oninput="ApplyFilters" />
+                            <span>★★★★☆ 4.0 & up</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="Filter45Plus" @oninput="ApplyFilters" />
+                            <span>★★★★★ 4.5 & up</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Level Filter -->
+                <div style="margin-bottom: 24px;">
+                    <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--neutral-700);">Level</h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="FilterBeginner" @oninput="ApplyFilters" />
+                            <span>Beginner</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="FilterIntermediate" @oninput="ApplyFilters" />
+                            <span>Intermediate</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="FilterAdvanced" @oninput="ApplyFilters" />
+                            <span>Advanced</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Duration Filter -->
+                <div style="margin-bottom: 24px;">
+                    <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--neutral-700);">Duration</h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="FilterShort" @oninput="ApplyFilters" />
+                            <span>0-2 hours</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="FilterMedium" @oninput="ApplyFilters" />
+                            <span>3-6 hours</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                            <input type="checkbox" @bind="FilterLong" @oninput="ApplyFilters" />
+                            <span>7+ hours</span>
+                        </label>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main>
+                <!-- Sort and Results Count -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div>
+                        <span style="font-size: 16px; font-weight: 400; color: var(--neutral-600);">
+                            @filteredCourses.Count results
+                        </span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 14px; color: var(--neutral-600);">Sort by:</span>
+                        <select @bind="SortBy" @oninput="ApplySorting"
+                                style="padding: 8px 12px; border: 1px solid var(--neutral-300); border-radius: 4px; font-size: 14px; background: #fff;">
+                            <option value="relevance">Most Relevant</option>
+                            <option value="rating">Highest Rated</option>
+                            <option value="newest">Newest</option>
+                            <option value="price-low">Price: Low to High</option>
+                            <option value="price-high">Price: High to Low</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Course Grid -->
+                <div class="udemy-course-grid">
+                    @foreach (var course in filteredCourses.Take(displayCount))
+                    {
+                        <CourseCard
+                            Title="@course.Title"
+                            Instructor="@course.Instructor"
+                            ImageUrl="@course.ImageUrl"
+                            Rating="@course.Rating"
+                            StudentsCount="@course.ReviewCount"
+                            Price="@course.Price.ToString("F2")"
+                            OriginalPrice="@course.OriginalPrice.ToString("F2")"
+                            CourseId="@course.Id"
+                            ShowBadge="@course.ShowBadge"
+                            BadgeText="@course.BadgeText" />
+                    }
+                </div>
+
+                <!-- Load More Button -->
+                @if (displayCount < filteredCourses.Count)
+                {
+                    <div style="text-align: center; margin-top: 32px;">
+                        <button class="udemy-btn udemy-btn-outline"
+                                @onclick="LoadMoreCourses"
+                                style="padding: 12px 32px;">
+                            Show more courses
+                        </button>
+                    </div>
+                }
+            </main>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Category { get; set; } = string.Empty;
+
+    // Filter properties
+    private bool FilterFree = false;
+    private bool FilterPaid = false;
+    private bool Filter4Plus = false;
+    private bool Filter45Plus = false;
+    private bool FilterBeginner = false;
+    private bool FilterIntermediate = false;
+    private bool FilterAdvanced = false;
+    private bool FilterShort = false;
+    private bool FilterMedium = false;
+    private bool FilterLong = false;
+    private string SortBy = "relevance";
+
+    private int displayCount = 12;
+    private List<CourseData> allCourses = new();
+    private List<CourseData> filteredCourses = new();
+
+    protected override void OnInitialized()
+    {
+        LoadSampleCourses();
+        ApplyFilters();
+    }
+
+    protected override void OnParametersSet()
+    {
+        ApplyFilters();
+    }
+
+    private void LoadSampleCourses()
+    {
+        allCourses = new List<CourseData>
+        {
+            new() { Id = "python-bootcamp", Title = "Complete Python Bootcamp From Zero to Hero in Python", Instructor = "Dr. Jose Portilla", Rating = 4.6, ReviewCount = 458839, Price = 89.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=240&h=135&fit=crop", Category = "development", Level = "beginner", Duration = 22 },
+            new() { Id = "web-developer", Title = "The Web Developer Bootcamp 2024", Instructor = "Colt Steele", Rating = 4.7, ReviewCount = 273924, Price = 94.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=240&h=135&fit=crop", Category = "development", Level = "beginner", Duration = 63.5 },
+            new() { Id = "react-guide", Title = "React - The Complete Guide 2024", Instructor = "Maximilian Schwarzmüller", Rating = 4.6, ReviewCount = 201582, Price = 89.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=240&h=135&fit=crop", Category = "development", Level = "intermediate", Duration = 40.5, ShowBadge = true, BadgeText = "Best Seller" },
+            new() { Id = "javascript-complete", Title = "The Complete JavaScript Course 2024", Instructor = "Jonas Schmedtmann", Rating = 4.7, ReviewCount = 176923, Price = 89.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?w=240&h=135&fit=crop", Category = "development", Level = "beginner", Duration = 69 },
+            new() { Id = "machine-learning", Title = "Machine Learning A-Z: AI, Python & R", Instructor = "Kirill Eremenko", Rating = 4.5, ReviewCount = 187294, Price = 89.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=240&h=135&fit=crop", Category = "it-software", Level = "intermediate", Duration = 44 },
+            new() { Id = "flutter-dart", Title = "Flutter & Dart - The Complete Guide", Instructor = "Maximilian Schwarzmüller", Rating = 4.6, ReviewCount = 45892, Price = 94.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=240&h=135&fit=crop", Category = "development", Level = "intermediate", Duration = 31.5 },
+            new() { Id = "aws-architect", Title = "AWS Certified Solutions Architect", Instructor = "Stephane Maarek", Rating = 4.7, ReviewCount = 164582, Price = 89.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=240&h=135&fit=crop", Category = "it-software", Level = "intermediate", Duration = 27 },
+            new() { Id = "data-science", Title = "Python for Data Science and Machine Learning", Instructor = "Jose Portilla", Rating = 4.6, ReviewCount = 124395, Price = 89.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=240&h=135&fit=crop", Category = "development", Level = "intermediate", Duration = 25 },
+            new() { Id = "digital-marketing", Title = "Complete Digital Marketing Course", Instructor = "Robin Haney", Rating = 4.4, ReviewCount = 89543, Price = 0, ImageUrl = "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=240&h=135&fit=crop", Category = "marketing", Level = "beginner", Duration = 16 },
+            new() { Id = "excel-mastery", Title = "Microsoft Excel - Excel from Beginner to Advanced", Instructor = "Kyle Pew", Rating = 4.6, ReviewCount = 256789, Price = 84.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=240&h=135&fit=crop", Category = "office-productivity", Level = "beginner", Duration = 18.5 },
+            new() { Id = "photoshop-complete", Title = "Adobe Photoshop CC - Essentials Training Course", Instructor = "Daniel Scott", Rating = 4.7, ReviewCount = 89432, Price = 94.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=240&h=135&fit=crop", Category = "design", Level = "beginner", Duration = 12 },
+            new() { Id = "node-complete", Title = "The Complete Node.js Developer Course", Instructor = "Andrew Mead", Rating = 4.7, ReviewCount = 98765, Price = 89.99m, OriginalPrice = 199.99m, ImageUrl = "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=240&h=135&fit=crop", Category = "development", Level = "intermediate", Duration = 35, ShowBadge = true, BadgeText = "Hot & New" }
+        };
+    }
+
+    private void ApplyFilters()
+    {
+        filteredCourses = allCourses.Where(course =>
+        {
+            // Category filter
+            if (!string.IsNullOrEmpty(Category) && !course.Category.Equals(Category, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            // Price filters
+            if (FilterFree && course.Price > 0) return false;
+            if (FilterPaid && course.Price == 0) return false;
+
+            // Rating filters
+            if (Filter4Plus && course.Rating < 4.0) return false;
+            if (Filter45Plus && course.Rating < 4.5) return false;
+
+            // Level filters
+            if (FilterBeginner && !course.Level.Equals("beginner", StringComparison.OrdinalIgnoreCase)) return false;
+            if (FilterIntermediate && !course.Level.Equals("intermediate", StringComparison.OrdinalIgnoreCase)) return false;
+            if (FilterAdvanced && !course.Level.Equals("advanced", StringComparison.OrdinalIgnoreCase)) return false;
+
+            // Duration filters
+            if (FilterShort && course.Duration > 2) return false;
+            if (FilterMedium && (course.Duration < 3 || course.Duration > 6)) return false;
+            if (FilterLong && course.Duration < 7) return false;
+
+            return true;
+        }).ToList();
+
+        ApplySorting();
+        displayCount = 12;
+        StateHasChanged();
+    }
+
+    private void ApplySorting()
+    {
+        filteredCourses = SortBy switch
+        {
+            "rating" => filteredCourses.OrderByDescending(c => c.Rating).ToList(),
+            "price-low" => filteredCourses.OrderBy(c => c.Price).ToList(),
+            "price-high" => filteredCourses.OrderByDescending(c => c.Price).ToList(),
+            "newest" => filteredCourses.OrderByDescending(c => c.Id).ToList(),
+            _ => filteredCourses.OrderByDescending(c => c.ReviewCount).ToList() // relevance
+        };
+        StateHasChanged();
+    }
+
+    private void LoadMoreCourses()
+    {
+        displayCount = Math.Min(displayCount + 12, filteredCourses.Count);
+        StateHasChanged();
+    }
+
+    private string GetPageTitle()
+    {
+        if (string.IsNullOrEmpty(Category))
+            return "All Courses";
+
+        return GetCategoryDisplayName(Category) + " Courses";
+    }
+
+    private string GetCategoryDisplayName(string category)
+    {
+        return category.ToLowerInvariant() switch
+        {
+            "development" => "Development",
+            "business" => "Business",
+            "finance-accounting" => "Finance & Accounting",
+            "it-software" => "IT & Software",
+            "office-productivity" => "Office Productivity",
+            "personal-development" => "Personal Development",
+            "design" => "Design",
+            "marketing" => "Marketing",
+            "lifestyle" => "Lifestyle",
+            "photography" => "Photography & Video",
+            "health-fitness" => "Health & Fitness",
+            "music" => "Music",
+            "teaching" => "Teaching & Academics",
+            _ => category
+        };
+    }
+
+    public class CourseData
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Instructor { get; set; } = string.Empty;
+        public double Rating { get; set; }
+        public int ReviewCount { get; set; }
+        public decimal Price { get; set; }
+        public decimal OriginalPrice { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string Level { get; set; } = "beginner";
+        public double Duration { get; set; }
+        public bool ShowBadge { get; set; }
+        public string BadgeText { get; set; } = string.Empty;
+    }
+}

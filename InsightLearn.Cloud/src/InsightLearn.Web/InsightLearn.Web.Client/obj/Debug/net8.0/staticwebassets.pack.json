@@ -1,0 +1,37 @@
+{
+  "Files": [
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/bin/Debug/net8.0/wwwroot/_framework/blazor.webassembly.js",
+      "PackagePath": "staticwebassets/_framework/blazor.webassembly.js"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/obj/Debug/net8.0/compressed/9wnyggqqbq.gz",
+      "PackagePath": "staticwebassets/_framework/blazor.webassembly.js.gz"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/wwwroot/appsettings.Development.json",
+      "PackagePath": "staticwebassets/appsettings.Development.json"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/wwwroot/appsettings.json",
+      "PackagePath": "staticwebassets/appsettings.json"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.InsightLearn.Web.Client.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.build.InsightLearn.Web.Client.props",
+      "PackagePath": "build\\InsightLearn.Web.Client.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.InsightLearn.Web.Client.props",
+      "PackagePath": "buildMultiTargeting\\InsightLearn.Web.Client.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.InsightLearn.Web.Client.props",
+      "PackagePath": "buildTransitive\\InsightLearn.Web.Client.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

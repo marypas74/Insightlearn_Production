@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: insightlearn-ingress-ip
+  namespace: insightlearn
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: insightlearn-frontend-service
+            port:
+              number: 80
+      - path: /api/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: insightlearn-backend-service
+            port:
+              number: 5000
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: insightlearn-backend-service
+            port:
+              number: 5000

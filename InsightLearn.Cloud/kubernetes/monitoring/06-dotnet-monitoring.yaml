@@ -1,0 +1,534 @@
+# ConfigMap for .NET application monitoring configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dotnet-monitoring-config
+  namespace: insightlearn
+  labels:
+    app: insightlearn-dotnet-monitoring
+data:
+  appsettings.Monitoring.json: |
+    {
+      "Prometheus": {
+        "Enabled": true,
+        "MetricsPath": "/metrics",
+        "Port": 9090,
+        "IncludeHttpMetrics": true,
+        "IncludeSystemMetrics": true,
+        "IncludeCustomMetrics": true
+      },
+      "HealthChecks": {
+        "Enabled": true,
+        "Path": "/health",
+        "ReadinessPath": "/health/ready",
+        "LivenessPath": "/health/live",
+        "DetailedErrors": true,
+        "ResponseWriter": "Detailed"
+      },
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning",
+          "Microsoft.EntityFrameworkCore": "Information",
+          "System.Net.Http.HttpClient": "Warning"
+        },
+        "Elasticsearch": {
+          "Enabled": true,
+          "Uri": "http://elasticsearch.insightlearn-data.svc.cluster.local:9200",
+          "IndexFormat": "insightlearn-api-{0:yyyy.MM.dd}",
+          "AutoRegisterTemplate": true,
+          "IncludeScopes": true,
+          "TypeName": "_doc"
+        },
+        "Console": {
+          "Enabled": true,
+          "IncludeScopes": true
+        },
+        "File": {
+          "Enabled": false
+        }
+      },
+      "OpenTelemetry": {
+        "Enabled": true,
+        "ServiceName": "InsightLearn.API",
+        "ServiceVersion": "1.0.0",
+        "Jaeger": {
+          "Endpoint": "http://jaeger-collector.insightlearn-monitoring.svc.cluster.local:14268/api/traces"
+        },
+        "Prometheus": {
+          "Endpoint": "http://prometheus.insightlearn-monitoring.svc.cluster.local:9090"
+        }
+      },
+      "CustomMetrics": {
+        "UserRegistrations": {
+          "Enabled": true,
+          "Name": "user_registrations_total",
+          "Description": "Total number of user registrations",
+          "Type": "Counter"
+        },
+        "CourseViews": {
+          "Enabled": true,
+          "Name": "course_views_total",
+          "Description": "Total number of course views",
+          "Type": "Counter"
+        },
+        "AIRequests": {
+          "Enabled": true,
+          "Name": "ai_requests_total",
+          "Description": "Total number of AI service requests",
+          "Type": "Counter"
+        },
+        "DatabaseQueries": {
+          "Enabled": true,
+          "Name": "database_queries_duration_seconds",
+          "Description": "Duration of database queries",
+          "Type": "Histogram"
+        },
+        "ActiveUsers": {
+          "Enabled": true,
+          "Name": "active_users_current",
+          "Description": "Current number of active users",
+          "Type": "Gauge"
+        }
+      }
+    }
+
+---
+# Deployment patch for API with monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-monitoring-patch
+  namespace: insightlearn
+  labels:
+    app: insightlearn-api-monitoring
+data:
+  patch.yaml: |
+    spec:
+      template:
+        metadata:
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "9090"
+            prometheus.io/path: "/metrics"
+        spec:
+          containers:
+          - name: api
+            ports:
+            - containerPort: 9090
+              name: metrics
+              protocol: TCP
+            env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: Prometheus__Enabled
+              value: "true"
+            - name: HealthChecks__Enabled
+              value: "true"
+            - name: Logging__Elasticsearch__Enabled
+              value: "true"
+            - name: Logging__Elasticsearch__Uri
+              value: "http://elasticsearch.insightlearn-data.svc.cluster.local:9200"
+            - name: OpenTelemetry__Enabled
+              value: "true"
+            livenessProbe:
+              httpGet:
+                path: /health/live
+                port: 80
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 3
+              successThreshold: 1
+            readinessProbe:
+              httpGet:
+                path: /health/ready
+                port: 80
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 3
+              successThreshold: 1
+            startupProbe:
+              httpGet:
+                path: /health/ready
+                port: 80
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 30
+            volumeMounts:
+            - name: monitoring-config
+              mountPath: /app/appsettings.Monitoring.json
+              subPath: appsettings.Monitoring.json
+          volumes:
+          - name: monitoring-config
+            configMap:
+              name: dotnet-monitoring-config
+
+---
+# Service for API metrics endpoint
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightlearn-api-metrics
+  namespace: insightlearn
+  labels:
+    app: insightlearn-api
+    component: metrics
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  selector:
+    app: insightlearn-api
+  type: ClusterIP
+
+---
+# Web deployment patch for monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-monitoring-patch
+  namespace: insightlearn
+  labels:
+    app: insightlearn-web-monitoring
+data:
+  patch.yaml: |
+    spec:
+      template:
+        metadata:
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "9091"
+            prometheus.io/path: "/metrics"
+        spec:
+          containers:
+          - name: web
+            ports:
+            - containerPort: 9091
+              name: metrics
+              protocol: TCP
+            env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: Prometheus__Enabled
+              value: "true"
+            - name: HealthChecks__Enabled
+              value: "true"
+            - name: Logging__Elasticsearch__Enabled
+              value: "true"
+            livenessProbe:
+              httpGet:
+                path: /health/live
+                port: 80
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 3
+            readinessProbe:
+              httpGet:
+                path: /health/ready
+                port: 80
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 3
+            startupProbe:
+              httpGet:
+                path: /health/ready
+                port: 80
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 30
+            volumeMounts:
+            - name: monitoring-config
+              mountPath: /app/appsettings.Monitoring.json
+              subPath: appsettings.Monitoring.json
+          volumes:
+          - name: monitoring-config
+            configMap:
+              name: dotnet-monitoring-config
+
+---
+# Service for Web metrics endpoint
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightlearn-web-metrics
+  namespace: insightlearn
+  labels:
+    app: insightlearn-web
+    component: metrics
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9091"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+  - name: metrics
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  selector:
+    app: insightlearn-web
+  type: ClusterIP
+
+---
+# Health check dashboard service
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightlearn-health-dashboard
+  namespace: insightlearn
+  labels:
+    app: insightlearn-health
+    component: dashboard
+spec:
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: insightlearn-health-dashboard
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-health-dashboard
+  namespace: insightlearn
+  labels:
+    app: insightlearn-health-dashboard
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insightlearn-health-dashboard
+  template:
+    metadata:
+      labels:
+        app: insightlearn-health-dashboard
+        component: monitoring
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: health-dashboard
+        image: nginx:alpine
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: health-dashboard-config
+          mountPath: /etc/nginx/conf.d/
+        - name: health-dashboard-html
+          mountPath: /usr/share/nginx/html/
+        resources:
+          requests:
+            memory: '32Mi'
+            cpu: '10m'
+          limits:
+            memory: '64Mi'
+            cpu: '50m'
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: health-dashboard-config
+        configMap:
+          name: health-dashboard-nginx-config
+      - name: health-dashboard-html
+        configMap:
+          name: health-dashboard-html
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-dashboard-nginx-config
+  namespace: insightlearn
+  labels:
+    app: insightlearn-health-dashboard
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        server_name localhost;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location / {
+            try_files $uri $uri/ =404;
+        }
+
+        location /api/ {
+            proxy_pass http://insightlearn-api.insightlearn.svc.cluster.local/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        location /health-api {
+            proxy_pass http://insightlearn-api.insightlearn.svc.cluster.local/health;
+        }
+
+        location /health-web {
+            proxy_pass http://insightlearn-web.insightlearn.svc.cluster.local/health;
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-dashboard-html
+  namespace: insightlearn
+  labels:
+    app: insightlearn-health-dashboard
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>InsightLearn Health Dashboard</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+            .container { max-width: 1200px; margin: 0 auto; }
+            .service {
+                background: white;
+                padding: 20px;
+                margin: 10px 0;
+                border-radius: 5px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .status {
+                display: inline-block;
+                padding: 5px 10px;
+                border-radius: 3px;
+                color: white;
+                font-weight: bold;
+            }
+            .healthy { background-color: #28a745; }
+            .unhealthy { background-color: #dc3545; }
+            .degraded { background-color: #ffc107; color: black; }
+            .loading { background-color: #6c757d; }
+            h1 { text-align: center; color: #333; }
+            .refresh { text-align: center; margin: 20px 0; }
+            button {
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+            button:hover { background: #0056b3; }
+            .details { margin-top: 10px; font-size: 0.9em; color: #666; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>InsightLearn Health Dashboard</h1>
+            <div class="refresh">
+                <button onclick="refreshStatus()">Refresh Status</button>
+                <span id="lastUpdate"></span>
+            </div>
+
+            <div class="service">
+                <h3>API Service</h3>
+                <span id="api-status" class="status loading">Checking...</span>
+                <div id="api-details" class="details"></div>
+            </div>
+
+            <div class="service">
+                <h3>Web Service</h3>
+                <span id="web-status" class="status loading">Checking...</span>
+                <div id="web-details" class="details"></div>
+            </div>
+
+            <div class="service">
+                <h3>External Services</h3>
+                <div style="margin-left: 20px;">
+                    <p><strong>Prometheus:</strong> <a href="http://prometheus.insightlearn-monitoring.svc.cluster.local:9090" target="_blank">http://prometheus.insightlearn-monitoring.svc.cluster.local:9090</a></p>
+                    <p><strong>Grafana:</strong> <a href="http://grafana.insightlearn-monitoring.svc.cluster.local:3000" target="_blank">http://grafana.insightlearn-monitoring.svc.cluster.local:3000</a></p>
+                    <p><strong>Kibana:</strong> <a href="http://kibana.insightlearn-monitoring.svc.cluster.local:5601" target="_blank">http://kibana.insightlearn-monitoring.svc.cluster.local:5601</a></p>
+                    <p><strong>AlertManager:</strong> <a href="http://alertmanager.insightlearn-monitoring.svc.cluster.local:9093" target="_blank">http://alertmanager.insightlearn-monitoring.svc.cluster.local:9093</a></p>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            async function checkHealth(service, url) {
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+
+                    const statusEl = document.getElementById(service + '-status');
+                    const detailsEl = document.getElementById(service + '-details');
+
+                    if (data.status === 'Healthy') {
+                        statusEl.className = 'status healthy';
+                        statusEl.textContent = 'Healthy';
+                    } else if (data.status === 'Degraded') {
+                        statusEl.className = 'status degraded';
+                        statusEl.textContent = 'Degraded';
+                    } else {
+                        statusEl.className = 'status unhealthy';
+                        statusEl.textContent = 'Unhealthy';
+                    }
+
+                    detailsEl.innerHTML = `
+                        <strong>Duration:</strong> ${data.totalDuration}<br>
+                        <strong>Checks:</strong> ${JSON.stringify(data.entries, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;')}
+                    `;
+                } catch (error) {
+                    const statusEl = document.getElementById(service + '-status');
+                    const detailsEl = document.getElementById(service + '-details');
+
+                    statusEl.className = 'status unhealthy';
+                    statusEl.textContent = 'Error';
+                    detailsEl.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                }
+            }
+
+            function refreshStatus() {
+                document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleString()}`;
+                checkHealth('api', '/health-api');
+                checkHealth('web', '/health-web');
+            }
+
+            // Initial load and auto-refresh every 30 seconds
+            refreshStatus();
+            setInterval(refreshStatus, 30000);
+        </script>
+    </body>
+    </html>

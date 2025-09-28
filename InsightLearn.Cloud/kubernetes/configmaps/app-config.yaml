@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insightlearn-config
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: config
+data:
+  # Application settings
+  ASPNETCORE_ENVIRONMENT: "Development"
+  ASPNETCORE_URLS: "http://+:80"
+  
+  # Database settings (will be overridden by secrets)
+  ConnectionStrings__DefaultConnection: ""
+  ConnectionStrings__MongoConnection: ""
+  ConnectionStrings__RedisConnection: ""
+  ConnectionStrings__ElasticsearchConnection: ""
+  
+  # Feature flags
+  Features__EnableAI: "true"
+  Features__EnableAnalytics: "true"
+  Features__EnableCaching: "true"
+  
+  # Logging
+  Logging__LogLevel__Default: "Information"
+  Logging__LogLevel__Microsoft: "Warning"
+  Logging__LogLevel__Microsoft.Hosting.Lifetime: "Information"

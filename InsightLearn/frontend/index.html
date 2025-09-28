@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InsightLearn - E-Learning Platform</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>InsightLearn</h1>
+            <ul class="nav-links">
+                <li><a href="#courses">Courses</a></li>
+                <li><a href="#about">About</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <h2>Welcome to InsightLearn</h2>
+            <p>Your gateway to quality online education</p>
+            <button class="cta-button" onclick="loadCourses()">Explore Courses</button>
+        </div>
+    </section>
+
+    <section id="courses" class="courses">
+        <div class="container">
+            <h2>Available Courses</h2>
+            <div id="course-list" class="course-grid"></div>
+        </div>
+    </section>
+
+    <section class="add-course">
+        <div class="container">
+            <h3>Add New Course</h3>
+            <form id="course-form">
+                <input type="text" id="title" placeholder="Course Title" required>
+                <textarea id="description" placeholder="Course Description" rows="3"></textarea>
+                <input type="text" id="instructor" placeholder="Instructor Name">
+                <input type="number" id="duration" placeholder="Duration (hours)">
+                <button type="submit">Add Course</button>
+            </form>
+        </div>
+    </section>
+
+    <div id="enrollment-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Enroll in Course</h3>
+            <input type="text" id="student-name" placeholder="Your Name" required>
+            <button onclick="enrollStudent()">Enroll</button>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 InsightLearn. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

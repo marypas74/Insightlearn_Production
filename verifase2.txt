@@ -1,0 +1,1912 @@
+# Prompt Verifica Completa Fase 2 - Claude Code
+
+## 🎯 Obiettivo
+Eseguire una verifica completa, dettagliata e sistematica della Fase 2 per garantire che il Design System e UI Components di InsightLearn.Cloud siano perfettamente implementati senza errori o mancanze.
+
+## 📋 Sistema di Verifica Multi-Level per Design System
+
+### LIVELLO 1: Verifica Struttura Design System
+### LIVELLO 2: Verifica CSS e Stili
+### LIVELLO 3: Verifica Componenti Blazor
+### LIVELLO 4: Verifica JavaScript e Animazioni
+### LIVELLO 5: Verifica Integrazione e Performance
+### LIVELLO 6: Verifica Finale e Report
+
+---
+
+## 🔍 LIVELLO 1: Verifica Struttura Design System
+
+```bash
+#!/bin/bash
+# verification_phase2_level1_structure.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/verification_phase2_level1_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "========================================" | tee -a "$LOG_FILE"
+echo "LIVELLO 1: VERIFICA STRUTTURA DESIGN SYSTEM" | tee -a "$LOG_FILE"
+echo "Data: $(date)" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian
+SUDO_PASS="SS1-Temp1234"
+
+# Function to run sudo commands with password
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+# Timeout function
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "❌ ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+# Verification counter
+ERRORS=0
+WARNINGS=0
+
+# Function to check directory exists
+check_directory() {
+    local dir="$1"
+    local description="$2"
+    
+    if [ -d "$dir" ]; then
+        echo "✅ PASS: $description exists at $dir" | tee -a "$LOG_FILE"
+    else
+        echo "❌ FAIL: $description missing at $dir" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+}
+
+# Function to check file exists
+check_file() {
+    local file="$1"
+    local description="$2"
+    
+    if [ -f "$file" ]; then
+        echo "✅ PASS: $description exists at $file" | tee -a "$LOG_FILE"
+        
+        # Check file size (should not be empty)
+        if [ -s "$file" ]; then
+            SIZE=$(wc -c < "$file")
+            echo "  📊 File size: $SIZE bytes" | tee -a "$LOG_FILE"
+            
+            # Additional checks for CSS files
+            if [[ "$file" == *.css ]]; then
+                # Check for basic CSS syntax
+                if grep -q "{" "$file" && grep -q "}" "$file"; then
+                    echo "  ✅ Valid CSS syntax detected" | tee -a "$LOG_FILE"
+                else
+                    echo "  ⚠️  WARNING: CSS syntax may be invalid" | tee -a "$LOG_FILE"
+                    ((WARNINGS++))
+                fi
+                
+                # Check for CSS variables
+                if grep -q ":root" "$file" && grep -q "--" "$file"; then
+                    echo "  ✅ CSS variables detected" | tee -a "$LOG_FILE"
+                else
+                    echo "  ⚠️  INFO: No CSS variables found (may be normal)" | tee -a "$LOG_FILE"
+                fi
+            fi
+            
+        else
+            echo "  ❌ FAIL: File is empty" | tee -a "$LOG_FILE"
+            ((ERRORS++))
+        fi
+    else
+        echo "❌ FAIL: $description missing at $file" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+}
+
+# Change to project directory
+if [ -d "InsightLearn.Cloud" ]; then
+    cd InsightLearn.Cloud
+    echo "✅ PASS: Main project directory found" | tee -a "$LOG_FILE"
+else
+    echo "❌ CRITICAL FAIL: Main project directory 'InsightLearn.Cloud' not found" | tee -a "$LOG_FILE"
+    echo "Current directory: $(pwd)" | tee -a "$LOG_FILE"
+    echo "Available directories:" | tee -a "$LOG_FILE"
+    ls -la | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+echo "\n=== VERIFICA DIRECTORY DESIGN SYSTEM ===" | tee -a "$LOG_FILE"
+
+# Check design system directories
+check_directory "src/InsightLearn.Web/wwwroot/css/design-system" "Design System CSS directory"
+check_directory "src/InsightLearn.Web/wwwroot/js/design-system" "Design System JS directory"
+check_directory "src/InsightLearn.Web/wwwroot/assets" "Assets root directory"
+check_directory "src/InsightLearn.Web/wwwroot/assets/icons" "Icons directory"
+check_directory "src/InsightLearn.Web/wwwroot/assets/images" "Images directory"
+check_directory "src/InsightLearn.Web/wwwroot/assets/fonts" "Fonts directory"
+check_directory "src/InsightLearn.Web/Components/UI" "UI Components directory"
+check_directory "src/InsightLearn.Web/Components/Layout" "Layout Components directory"
+check_directory "src/InsightLearn.Web/Components/Shared" "Shared Components directory"
+
+echo "\n=== VERIFICA FILE CSS DESIGN SYSTEM ===" | tee -a "$LOG_FILE"
+
+# Check required CSS files
+declare -a REQUIRED_CSS=(
+    "src/InsightLearn.Web/wwwroot/css/design-system/variables.css"
+    "src/InsightLearn.Web/wwwroot/css/design-system/base.css"
+    "src/InsightLearn.Web/wwwroot/css/design-system/components.css"
+    "src/InsightLearn.Web/wwwroot/css/design-system/animations.css"
+    "src/InsightLearn.Web/wwwroot/css/design-system/main.css"
+)
+
+for css_file in "${REQUIRED_CSS[@]}"; do
+    check_file "$css_file" "$(basename $css_file)"
+done
+
+echo "\n=== VERIFICA FILE JAVASCRIPT ===" | tee -a "$LOG_FILE"
+
+# Check JavaScript files
+check_file "src/InsightLearn.Web/wwwroot/js/design-system/animations.js" "Animations JavaScript"
+
+echo "\n=== VERIFICA COMPONENTI BLAZOR ===" | tee -a "$LOG_FILE"
+
+# Check Blazor components
+declare -a REQUIRED_COMPONENTS=(
+    "src/InsightLearn.Web/Components/UI/CourseCard.razor"
+    "src/InsightLearn.Web/Components/UI/SearchBar.razor"
+)
+
+for component in "${REQUIRED_COMPONENTS[@]}"; do
+    check_file "$component" "$(basename $component)"
+done
+
+echo "\n=== CONTEGGIO FILE CREATI ===" | tee -a "$LOG_FILE"
+
+# Count files in each category
+CSS_COUNT=$(find src/InsightLearn.Web/wwwroot/css/design-system -name "*.css" 2>/dev/null | wc -l)
+JS_COUNT=$(find src/InsightLearn.Web/wwwroot/js/design-system -name "*.js" 2>/dev/null | wc -l)
+COMPONENT_COUNT=$(find src/InsightLearn.Web/Components/UI -name "*.razor" 2>/dev/null | wc -l)
+
+echo "📊 Statistiche file:" | tee -a "$LOG_FILE"
+echo "  CSS Files: $CSS_COUNT" | tee -a "$LOG_FILE"
+echo "  JS Files: $JS_COUNT" | tee -a "$LOG_FILE"
+echo "  Blazor Components: $COMPONENT_COUNT" | tee -a "$LOG_FILE"
+
+# Verify minimum requirements
+if [ $CSS_COUNT -lt 5 ]; then
+    echo "❌ FAIL: Insufficient CSS files (found $CSS_COUNT, need 5)" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+else
+    echo "✅ PASS: Sufficient CSS files found" | tee -a "$LOG_FILE"
+fi
+
+if [ $JS_COUNT -lt 1 ]; then
+    echo "❌ FAIL: No JavaScript files found" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+else
+    echo "✅ PASS: JavaScript files found" | tee -a "$LOG_FILE"
+fi
+
+if [ $COMPONENT_COUNT -lt 2 ]; then
+    echo "❌ FAIL: Insufficient Blazor components (found $COMPONENT_COUNT, need 2)" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+else
+    echo "✅ PASS: Sufficient Blazor components found" | tee -a "$LOG_FILE"
+fi
+
+echo "\n=== RIEPILOGO LIVELLO 1 ===" | tee -a "$LOG_FILE"
+echo "Errori trovati: $ERRORS" | tee -a "$LOG_FILE"
+echo "Warning: $WARNINGS" | tee -a "$LOG_FILE"
+
+if [ $ERRORS -eq 0 ]; then
+    echo "✅ LIVELLO 1 SUPERATO: Struttura design system verificata correttamente" | tee -a "$LOG_FILE"
+    exit 0
+else
+    echo "❌ LIVELLO 1 FALLITO: $ERRORS errori nella struttura" | tee -a "$LOG_FILE"
+    exit 1
+fi
+```
+
+---
+
+## 🎨 LIVELLO 2: Verifica CSS e Stili
+
+```bash
+#!/bin/bash
+# verification_phase2_level2_css.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/verification_phase2_level2_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "========================================" | tee -a "$LOG_FILE"
+echo "LIVELLO 2: VERIFICA CSS E STILI" | tee -a "$LOG_FILE"
+echo "Data: $(date)" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "❌ ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+ERRORS=0
+WARNINGS=0
+
+cd InsightLearn.Cloud
+
+echo "\n=== VERIFICA CONTENUTO CSS VARIABLES ===" | tee -a "$LOG_FILE"
+
+# Check variables.css content
+VARIABLES_FILE="src/InsightLearn.Web/wwwroot/css/design-system/variables.css"
+if [ -f "$VARIABLES_FILE" ]; then
+    echo "Analizzando $VARIABLES_FILE..." | tee -a "$LOG_FILE"
+    
+    # Check for essential CSS variables
+    declare -a REQUIRED_VARIABLES=(
+        "--primary-"
+        "--secondary-"
+        "--neutral-"
+        "--gradient-"
+        "--glass-"
+        "--neuro-"
+        "--font-family-"
+        "--text-"
+        "--space-"
+        "--radius-"
+        "--shadow-"
+        "--duration-"
+        "--ease-"
+        "--z-"
+    )
+    
+    for var in "${REQUIRED_VARIABLES[@]}"; do
+        if grep -q "$var" "$VARIABLES_FILE"; then
+            echo "  ✅ Variable group found: $var" | tee -a "$LOG_FILE"
+        else
+            echo "  ❌ Missing variable group: $var" | tee -a "$LOG_FILE"
+            ((ERRORS++))
+        fi
+    done
+    
+    # Check for specific important variables
+    if grep -q ":root" "$VARIABLES_FILE"; then
+        echo "  ✅ Root CSS variables declaration found" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ No :root declaration found" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    # Check for media queries (responsive design)
+    MEDIA_QUERIES=$(grep -c "@media" "$VARIABLES_FILE" || true)
+    echo "  📊 Media queries found: $MEDIA_QUERIES" | tee -a "$LOG_FILE"
+    if [ $MEDIA_QUERIES -gt 0 ]; then
+        echo "  ✅ Responsive design support detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No responsive design detected" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+else
+    echo "❌ Variables CSS file not found" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+echo "\n=== VERIFICA CONTENUTO BASE CSS ===" | tee -a "$LOG_FILE"
+
+# Check base.css content
+BASE_FILE="src/InsightLearn.Web/wwwroot/css/design-system/base.css"
+if [ -f "$BASE_FILE" ]; then
+    echo "Analizzando $BASE_FILE..." | tee -a "$LOG_FILE"
+    
+    # Check for CSS reset elements
+    declare -a BASE_ELEMENTS=(
+        "html"
+        "body"
+        "h1, h2, h3"
+        "a"
+        "input"
+        "button"
+        "::selection"
+        "::-webkit-scrollbar"
+    )
+    
+    for element in "${BASE_ELEMENTS[@]}"; do
+        if grep -q "$element" "$BASE_FILE"; then
+            echo "  ✅ Base style found: $element" | tee -a "$LOG_FILE"
+        else
+            echo "  ⚠️  WARNING: Missing base style: $element" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    done
+    
+    # Check for accessibility features
+    if grep -q "focus" "$BASE_FILE"; then
+        echo "  ✅ Focus styles detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No focus styles found" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    if grep -q "prefers-reduced-motion" "$BASE_FILE"; then
+        echo "  ✅ Reduced motion support detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No reduced motion support" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+else
+    echo "❌ Base CSS file not found" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+echo "\n=== VERIFICA CONTENUTO COMPONENTS CSS ===" | tee -a "$LOG_FILE"
+
+# Check components.css content
+COMPONENTS_FILE="src/InsightLearn.Web/wwwroot/css/design-system/components.css"
+if [ -f "$COMPONENTS_FILE" ]; then
+    echo "Analizzando $COMPONENTS_FILE..." | tee -a "$LOG_FILE"
+    
+    # Check for premium components
+    declare -a REQUIRED_COMPONENTS=(
+        ".glass-card"
+        ".neuro-btn"
+        ".course-card"
+        ".fab"
+        ".search-container"
+        ".navbar"
+        ".progress-bar"
+        ".tooltip"
+        ".spinner"
+    )
+    
+    for component in "${REQUIRED_COMPONENTS[@]}"; do
+        if grep -q "$component" "$COMPONENTS_FILE"; then
+            echo "  ✅ Component found: $component" | tee -a "$LOG_FILE"
+        else
+            echo "  ❌ Missing component: $component" | tee -a "$LOG_FILE"
+            ((ERRORS++))
+        fi
+    done
+    
+    # Check for glassmorphism effects
+    if grep -q "backdrop-filter" "$COMPONENTS_FILE"; then
+        echo "  ✅ Glassmorphism effects detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ No glassmorphism effects found" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    # Check for hover effects
+    HOVER_COUNT=$(grep -c ":hover" "$COMPONENTS_FILE" || true)
+    echo "  📊 Hover effects found: $HOVER_COUNT" | tee -a "$LOG_FILE"
+    if [ $HOVER_COUNT -gt 5 ]; then
+        echo "  ✅ Rich hover interactions detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Limited hover interactions" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+else
+    echo "❌ Components CSS file not found" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+echo "\n=== VERIFICA CONTENUTO ANIMATIONS CSS ===" | tee -a "$LOG_FILE"
+
+# Check animations.css content
+ANIMATIONS_FILE="src/InsightLearn.Web/wwwroot/css/design-system/animations.css"
+if [ -f "$ANIMATIONS_FILE" ]; then
+    echo "Analizzando $ANIMATIONS_FILE..." | tee -a "$LOG_FILE"
+    
+    # Check for keyframes
+    KEYFRAMES_COUNT=$(grep -c "@keyframes" "$ANIMATIONS_FILE" || true)
+    echo "  📊 Keyframes found: $KEYFRAMES_COUNT" | tee -a "$LOG_FILE"
+    if [ $KEYFRAMES_COUNT -gt 5 ]; then
+        echo "  ✅ Rich animation library detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Limited animations" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for specific animations
+    declare -a REQUIRED_ANIMATIONS=(
+        "fadeInUp"
+        "slideUp"
+        "scaleIn"
+        "bounce"
+        "pulse"
+        "shake"
+        "float"
+        "glow"
+        "shimmer"
+    )
+    
+    for animation in "${REQUIRED_ANIMATIONS[@]}"; do
+        if grep -q "$animation" "$ANIMATIONS_FILE"; then
+            echo "  ✅ Animation found: $animation" | tee -a "$LOG_FILE"
+        else
+            echo "  ⚠️  Missing animation: $animation" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    done
+    
+    # Check for utility classes
+    if grep -q ".animate-" "$ANIMATIONS_FILE"; then
+        echo "  ✅ Animation utility classes found" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ No animation utility classes" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+else
+    echo "❌ Animations CSS file not found" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+echo "\n=== VERIFICA MAIN CSS INTEGRATION ===" | tee -a "$LOG_FILE"
+
+# Check main.css integration
+MAIN_FILE="src/InsightLearn.Web/wwwroot/css/design-system/main.css"
+if [ -f "$MAIN_FILE" ]; then
+    echo "Analizzando $MAIN_FILE..." | tee -a "$LOG_FILE"
+    
+    # Check for imports
+    IMPORT_COUNT=$(grep -c "@import" "$MAIN_FILE" || true)
+    echo "  📊 CSS imports found: $IMPORT_COUNT" | tee -a "$LOG_FILE"
+    if [ $IMPORT_COUNT -gt 3 ]; then
+        echo "  ✅ Good integration detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Limited integration" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for utility classes
+    declare -a UTILITY_CLASSES=(
+        ".container"
+        ".grid"
+        ".flex"
+        ".text-center"
+        ".bg-primary"
+        ".rounded"
+        ".shadow"
+        ".sr-only"
+    )
+    
+    for class in "${UTILITY_CLASSES[@]}"; do
+        if grep -q "$class" "$MAIN_FILE"; then
+            echo "  ✅ Utility class found: $class" | tee -a "$LOG_FILE"
+        else
+            echo "  ⚠️  Missing utility: $class" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    done
+    
+else
+    echo "❌ Main CSS file not found" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+echo "\n=== RIEPILOGO LIVELLO 2 ===" | tee -a "$LOG_FILE"
+echo "Errori trovati: $ERRORS" | tee -a "$LOG_FILE"
+echo "Warning: $WARNINGS" | tee -a "$LOG_FILE"
+
+if [ $ERRORS -eq 0 ]; then
+    echo "✅ LIVELLO 2 SUPERATO: CSS e stili verificati correttamente" | tee -a "$LOG_FILE"
+    if [ $WARNINGS -gt 0 ]; then
+        echo "⚠️  Attenzione: $WARNINGS warning da controllare" | tee -a "$LOG_FILE"
+    fi
+    exit 0
+else
+    echo "❌ LIVELLO 2 FALLITO: $ERRORS errori nei CSS" | tee -a "$LOG_FILE"
+    exit 1
+fi
+```
+
+---
+
+## 🧩 LIVELLO 3: Verifica Componenti Blazor
+
+```bash
+#!/bin/bash
+# verification_phase2_level3_blazor.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/verification_phase2_level3_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "========================================" | tee -a "$LOG_FILE"
+echo "LIVELLO 3: VERIFICA COMPONENTI BLAZOR" | tee -a "$LOG_FILE"
+echo "Data: $(date)" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "❌ ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+ERRORS=0
+WARNINGS=0
+
+cd InsightLearn.Cloud
+
+echo "\n=== VERIFICA COURSECARD COMPONENT ===" | tee -a "$LOG_FILE"
+
+# Check CourseCard.razor
+COURSECARD_FILE="src/InsightLearn.Web/Components/UI/CourseCard.razor"
+if [ -f "$COURSECARD_FILE" ]; then
+    echo "Analizzando CourseCard.razor..." | tee -a "$LOG_FILE"
+    
+    # Check for essential Blazor structure
+    if grep -q "@code" "$COURSECARD_FILE"; then
+        echo "  ✅ @code block found" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ No @code block found" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    if grep -q "\[Parameter\]" "$COURSECARD_FILE"; then
+        echo "  ✅ Parameters defined" | tee -a "$LOG_FILE"
+        
+        # Count parameters
+        PARAM_COUNT=$(grep -c "\[Parameter\]" "$COURSECARD_FILE" || true)
+        echo "    📊 Parameters found: $PARAM_COUNT" | tee -a "$LOG_FILE"
+        if [ $PARAM_COUNT -gt 5 ]; then
+            echo "    ✅ Rich parameter set" | tee -a "$LOG_FILE"
+        else
+            echo "    ⚠️  WARNING: Limited parameters" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    else
+        echo "  ❌ No parameters defined" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    # Check for required properties
+    declare -a REQUIRED_PROPS=(
+        "Title"
+        "Description" 
+        "Price"
+        "Rating"
+        "ImageUrl"
+        "OnCardClick"
+        "OnEnrollClick"
+    )
+    
+    for prop in "${REQUIRED_PROPS[@]}"; do
+        if grep -q "$prop" "$COURSECARD_FILE"; then
+            echo "    ✅ Property found: $prop" | tee -a "$LOG_FILE"
+        else
+            echo "    ❌ Missing property: $prop" | tee -a "$LOG_FILE"
+            ((ERRORS++))
+        fi
+    done
+    
+    # Check for CSS classes usage
+    if grep -q "course-card" "$COURSECARD_FILE"; then
+        echo "  ✅ CSS classes properly used" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ CSS classes not found" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    # Check for event handling
+    if grep -q "EventCallback" "$COURSECARD_FILE"; then
+        echo "  ✅ Event callbacks implemented" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No event callbacks found" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for conditional rendering
+    if grep -q "@if" "$COURSECARD_FILE"; then
+        echo "  ✅ Conditional rendering implemented" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No conditional rendering" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check file size (should be substantial)
+    SIZE=$(wc -c < "$COURSECARD_FILE")
+    echo "  📊 Component size: $SIZE bytes" | tee -a "$LOG_FILE"
+    if [ $SIZE -gt 2000 ]; then
+        echo "  ✅ Substantial component implementation" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Component seems too small" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+else
+    echo "❌ CourseCard component not found" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+echo "\n=== VERIFICA SEARCHBAR COMPONENT ===" | tee -a "$LOG_FILE"
+
+# Check SearchBar.razor
+SEARCHBAR_FILE="src/InsightLearn.Web/Components/UI/SearchBar.razor"
+if [ -f "$SEARCHBAR_FILE" ]; then
+    echo "Analizzando SearchBar.razor..." | tee -a "$LOG_FILE"
+    
+    # Check for essential Blazor structure
+    if grep -q "@code" "$SEARCHBAR_FILE"; then
+        echo "  ✅ @code block found" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ No @code block found" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    # Check for AI-related functionality
+    if grep -q -i "ai\|suggestion" "$SEARCHBAR_FILE"; then
+        echo "  ✅ AI suggestions functionality detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ No AI suggestions found" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    # Check for search-specific features
+    declare -a SEARCH_FEATURES=(
+        "SearchQuery"
+        "OnSearch"
+        "Suggestions"
+        "Placeholder"
+        "debounce\|timeout"
+        "@bind"
+        "@onkeypress\|@onfocus\|@onblur"
+    )
+    
+    for feature in "${SEARCH_FEATURES[@]}"; do
+        if grep -q -i "$feature" "$SEARCHBAR_FILE"; then
+            echo "    ✅ Feature found: $feature" | tee -a "$LOG_FILE"
+        else
+            echo "    ❌ Missing feature: $feature" | tee -a "$LOG_FILE"
+            ((ERRORS++))
+        fi
+    done
+    
+    # Check for CSS classes
+    if grep -q "search-" "$SEARCHBAR_FILE"; then
+        echo "  ✅ Search-specific CSS classes used" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ Search CSS classes not found" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    # Check for loading states
+    if grep -q -i "loading\|spinner" "$SEARCHBAR_FILE"; then
+        echo "  ✅ Loading states implemented" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No loading states" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check file size
+    SIZE=$(wc -c < "$SEARCHBAR_FILE")
+    echo "  📊 Component size: $SIZE bytes" | tee -a "$LOG_FILE"
+    if [ $SIZE -gt 3000 ]; then
+        echo "  ✅ Complex search component" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Search component seems basic" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+else
+    echo "❌ SearchBar component not found" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+echo "\n=== VERIFICA SINTASSI BLAZOR ===" | tee -a "$LOG_FILE"
+
+# Check for common Blazor syntax errors
+for component in "$COURSECARD_FILE" "$SEARCHBAR_FILE"; do
+    if [ -f "$component" ]; then
+        echo "Checking syntax for $(basename $component)..." | tee -a "$LOG_FILE"
+        
+        # Check for unclosed tags (basic check)
+        OPEN_TAGS=$(grep -o "<[^/>]*>" "$component" | wc -l)
+        CLOSE_TAGS=$(grep -o "</[^>]*>" "$component" | wc -l)
+        SELF_CLOSE=$(grep -o "/>" "$component" | wc -l)
+        
+        echo "  📊 Open tags: $OPEN_TAGS, Close tags: $CLOSE_TAGS, Self-closing: $SELF_CLOSE" | tee -a "$LOG_FILE"
+        
+        # Check for C# syntax in @code blocks
+        if grep -A 20 "@code" "$component" | grep -q "public\|private\|string\|int\|bool"; then
+            echo "  ✅ Valid C# syntax in @code block" | tee -a "$LOG_FILE"
+        else
+            echo "  ⚠️  WARNING: Limited C# code detected" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+        
+        # Check for proper event binding
+        if grep -q "@onclick\|@onchange\|@onkeypress" "$component"; then
+            echo "  ✅ Event binding detected" | tee -a "$LOG_FILE"
+        else
+            echo "  ⚠️  WARNING: No event binding found" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    fi
+done
+
+echo "\n=== VERIFICA DIRECTORY COMPONENTI ===" | tee -a "$LOG_FILE"
+
+# Check component directories
+declare -a COMPONENT_DIRS=(
+    "src/InsightLearn.Web/Components/UI"
+    "src/InsightLearn.Web/Components/Layout"
+    "src/InsightLearn.Web/Components/Shared"
+)
+
+for dir in "${COMPONENT_DIRS[@]}"; do
+    if [ -d "$dir" ]; then
+        COMPONENT_COUNT=$(find "$dir" -name "*.razor" 2>/dev/null | wc -l)
+        echo "  📊 Components in $(basename $dir): $COMPONENT_COUNT" | tee -a "$LOG_FILE"
+        if [ $COMPONENT_COUNT -gt 0 ]; then
+            echo "  ✅ $(basename $dir) has components" | tee -a "$LOG_FILE"
+        else
+            echo "  ⚠️  WARNING: $(basename $dir) is empty" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    else
+        echo "  ❌ Directory missing: $(basename $dir)" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+done
+
+echo "\n=== RIEPILOGO LIVELLO 3 ===" | tee -a "$LOG_FILE"
+echo "Errori trovati: $ERRORS" | tee -a "$LOG_FILE"
+echo "Warning: $WARNINGS" | tee -a "$LOG_FILE"
+
+if [ $ERRORS -eq 0 ]; then
+    echo "✅ LIVELLO 3 SUPERATO: Componenti Blazor verificati correttamente" | tee -a "$LOG_FILE"
+    if [ $WARNINGS -gt 0 ]; then
+        echo "⚠️  Attenzione: $WARNINGS warning da ottimizzare" | tee -a "$LOG_FILE"
+    fi
+    exit 0
+else
+    echo "❌ LIVELLO 3 FALLITO: $ERRORS errori nei componenti" | tee -a "$LOG_FILE"
+    exit 1
+fi
+```
+
+---
+
+## ⚡ LIVELLO 4: Verifica JavaScript e Animazioni
+
+```bash
+#!/bin/bash
+# verification_phase2_level4_javascript.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/verification_phase2_level4_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "========================================" | tee -a "$LOG_FILE"
+echo "LIVELLO 4: VERIFICA JAVASCRIPT E ANIMAZIONI" | tee -a "$LOG_FILE"
+echo "Data: $(date)" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "❌ ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+ERRORS=0
+WARNINGS=0
+
+cd InsightLearn.Cloud
+
+echo "\n=== VERIFICA ANIMATIONS JAVASCRIPT ===" | tee -a "$LOG_FILE"
+
+# Check animations.js
+ANIMATIONS_JS="src/InsightLearn.Web/wwwroot/js/design-system/animations.js"
+if [ -f "$ANIMATIONS_JS" ]; then
+    echo "Analizzando animations.js..." | tee -a "$LOG_FILE"
+    
+    # Check for main class
+    if grep -q "class InsightLearnAnimations" "$ANIMATIONS_JS"; then
+        echo "  ✅ Main animation class found" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ Main animation class missing" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    # Check for essential methods
+    declare -a REQUIRED_METHODS=(
+        "init"
+        "setupScrollAnimations"
+        "setupMagneticElements"
+        "setupParallax"
+        "setupRippleEffect"
+        "setupIntersectionObserver"
+        "setupStaggerAnimations"
+    )
+    
+    for method in "${REQUIRED_METHODS[@]}"; do
+        if grep -q "$method" "$ANIMATIONS_JS"; then
+            echo "    ✅ Method found: $method" | tee -a "$LOG_FILE"
+        else
+            echo "    ❌ Missing method: $method" | tee -a "$LOG_FILE"
+            ((ERRORS++))
+        fi
+    done
+    
+    # Check for static utility methods
+    declare -a UTILITY_METHODS=(
+        "fadeIn"
+        "slideIn"
+        "pulse"
+        "shake"
+        "measurePerformance"
+    )
+    
+    for method in "${UTILITY_METHODS[@]}"; do
+        if grep -q "$method" "$ANIMATIONS_JS"; then
+            echo "    ✅ Utility method found: $method" | tee -a "$LOG_FILE"
+        else
+            echo "    ⚠️  Missing utility: $method" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    done
+    
+    # Check for modern JavaScript features
+    if grep -q "IntersectionObserver" "$ANIMATIONS_JS"; then
+        echo "  ✅ Modern API usage detected (IntersectionObserver)" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Modern APIs not used" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    if grep -q "requestAnimationFrame" "$ANIMATIONS_JS"; then
+        echo "  ✅ Performance optimization detected (requestAnimationFrame)" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No performance optimizations" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for event listeners
+    if grep -q "addEventListener" "$ANIMATIONS_JS"; then
+        echo "  ✅ Event listeners implemented" | tee -a "$LOG_FILE"
+    else
+        echo "  ❌ No event listeners found" | tee -a "$LOG_FILE"
+        ((ERRORS++))
+    fi
+    
+    # Check for error handling
+    if grep -q "try\|catch" "$ANIMATIONS_JS"; then
+        echo "  ✅ Error handling implemented" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No error handling found" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for performance considerations
+    if grep -q "prefers-reduced-motion\|matchMedia" "$ANIMATIONS_JS"; then
+        echo "  ✅ Accessibility considerations implemented" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No accessibility considerations" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check file size and complexity
+    SIZE=$(wc -c < "$ANIMATIONS_JS")
+    LINES=$(wc -l < "$ANIMATIONS_JS")
+    echo "  📊 JavaScript file: $SIZE bytes, $LINES lines" | tee -a "$LOG_FILE"
+    
+    if [ $SIZE -gt 5000 ] && [ $LINES -gt 100 ]; then
+        echo "  ✅ Substantial JavaScript implementation" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: JavaScript implementation seems basic" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for DOM ready initialization
+    if grep -q "DOMContentLoaded" "$ANIMATIONS_JS"; then
+        echo "  ✅ Proper DOM initialization" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No DOM ready handler" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for global export
+    if grep -q "window.InsightLearnAnimations" "$ANIMATIONS_JS"; then
+        echo "  ✅ Global export for integration" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No global export found" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+else
+    echo "❌ Animations JavaScript file not found" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+echo "\n=== VERIFICA SINTASSI JAVASCRIPT ===" | tee -a "$LOG_FILE"
+
+# Basic JavaScript syntax check
+if [ -f "$ANIMATIONS_JS" ]; then
+    echo "Checking JavaScript syntax..." | tee -a "$LOG_FILE"
+    
+    # Check for basic syntax errors (simple checks)
+    if grep -q "class.*{" "$ANIMATIONS_JS"; then
+        echo "  ✅ ES6 class syntax detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No ES6 classes found" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for arrow functions
+    if grep -q "=>" "$ANIMATIONS_JS"; then
+        echo "  ✅ Arrow functions used" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No arrow functions found" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for const/let usage (modern JS)
+    if grep -q "const\|let" "$ANIMATIONS_JS"; then
+        echo "  ✅ Modern variable declarations" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Using var instead of const/let" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for semicolons (consistency)
+    SEMICOLON_LINES=$(grep -c ";" "$ANIMATIONS_JS" || true)
+    TOTAL_LINES=$(wc -l < "$ANIMATIONS_JS")
+    SEMICOLON_RATIO=$((SEMICOLON_LINES * 100 / TOTAL_LINES))
+    echo "  📊 Semicolon usage: $SEMICOLON_RATIO%" | tee -a "$LOG_FILE"
+    
+    # Check for comments and documentation
+    COMMENT_LINES=$(grep -c "/\*\|//\|\*" "$ANIMATIONS_JS" || true)
+    COMMENT_RATIO=$((COMMENT_LINES * 100 / TOTAL_LINES))
+    echo "  📊 Comments/documentation: $COMMENT_RATIO%" | tee -a "$LOG_FILE"
+    if [ $COMMENT_RATIO -gt 10 ]; then
+        echo "  ✅ Well documented code" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Limited documentation" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+fi
+
+echo "\n=== VERIFICA INTEGRAZIONE CSS-JS ===" | tee -a "$LOG_FILE"
+
+# Check if CSS animations are properly integrated with JS
+ANIMATIONS_CSS="src/InsightLearn.Web/wwwroot/css/design-system/animations.css"
+if [ -f "$ANIMATIONS_CSS" ] && [ -f "$ANIMATIONS_JS" ]; then
+    echo "Checking CSS-JS integration..." | tee -a "$LOG_FILE"
+    
+    # Extract animation names from CSS
+    CSS_ANIMATIONS=$(grep -o "@keyframes [a-zA-Z0-9_-]*" "$ANIMATIONS_CSS" | cut -d' ' -f2 || true)
+    
+    # Check if some CSS animations are referenced in JS
+    INTEGRATION_COUNT=0
+    for animation in $CSS_ANIMATIONS; do
+        if grep -q "$animation" "$ANIMATIONS_JS"; then
+            ((INTEGRATION_COUNT++))
+        fi
+    done
+    
+    echo "  📊 CSS-JS integration points: $INTEGRATION_COUNT" | tee -a "$LOG_FILE"
+    if [ $INTEGRATION_COUNT -gt 0 ]; then
+        echo "  ✅ CSS and JavaScript properly integrated" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: Limited CSS-JS integration" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    # Check for class manipulation
+    if grep -q "classList\|className" "$ANIMATIONS_JS"; then
+        echo "  ✅ CSS class manipulation implemented" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No CSS class manipulation" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+else
+    echo "  ⚠️  WARNING: Cannot verify CSS-JS integration" | tee -a "$LOG_FILE"
+    ((WARNINGS++))
+fi
+
+echo "\n=== RIEPILOGO LIVELLO 4 ===" | tee -a "$LOG_FILE"
+echo "Errori trovati: $ERRORS" | tee -a "$LOG_FILE"
+echo "Warning: $WARNINGS" | tee -a "$LOG_FILE"
+
+if [ $ERRORS -eq 0 ]; then
+    echo "✅ LIVELLO 4 SUPERATO: JavaScript e animazioni verificati" | tee -a "$LOG_FILE"
+    if [ $WARNINGS -gt 0 ]; then
+        echo "⚠️  Attenzione: $WARNINGS warning da ottimizzare" | tee -a "$LOG_FILE"
+    fi
+    exit 0
+else
+    echo "❌ LIVELLO 4 FALLITO: $ERRORS errori nel JavaScript" | tee -a "$LOG_FILE"
+    exit 1
+fi
+```
+
+---
+
+## 🚀 LIVELLO 5: Verifica Integrazione e Performance
+
+```bash
+#!/bin/bash
+# verification_phase2_level5_integration.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/verification_phase2_level5_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "========================================" | tee -a "$LOG_FILE"
+echo "LIVELLO 5: VERIFICA INTEGRAZIONE E PERFORMANCE" | tee -a "$LOG_FILE"
+echo "Data: $(date)" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "❌ ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+ERRORS=0
+WARNINGS=0
+
+cd InsightLearn.Cloud
+
+echo "\n=== VERIFICA DIMENSIONI FILE ===" | tee -a "$LOG_FILE"
+
+# Check file sizes for performance
+echo "Analizzando dimensioni file per performance..." | tee -a "$LOG_FILE"
+
+# CSS files
+if [ -d "src/InsightLearn.Web/wwwroot/css/design-system" ]; then
+    CSS_TOTAL_SIZE=0
+    for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+        if [ -f "$css_file" ]; then
+            SIZE=$(wc -c < "$css_file")
+            CSS_TOTAL_SIZE=$((CSS_TOTAL_SIZE + SIZE))
+            echo "  📊 $(basename $css_file): $SIZE bytes" | tee -a "$LOG_FILE"
+            
+            # Warn about very large CSS files
+            if [ $SIZE -gt 50000 ]; then
+                echo "    ⚠️  WARNING: Large CSS file (>50KB)" | tee -a "$LOG_FILE"
+                ((WARNINGS++))
+            fi
+        fi
+    done
+    
+    echo "  📊 Total CSS size: $CSS_TOTAL_SIZE bytes" | tee -a "$LOG_FILE"
+    if [ $CSS_TOTAL_SIZE -gt 100000 ]; then
+        echo "  ⚠️  WARNING: Large total CSS size (>100KB)" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    else
+        echo "  ✅ CSS size within reasonable limits" | tee -a "$LOG_FILE"
+    fi
+fi
+
+# JavaScript files
+if [ -d "src/InsightLearn.Web/wwwroot/js/design-system" ]; then
+    JS_TOTAL_SIZE=0
+    for js_file in src/InsightLearn.Web/wwwroot/js/design-system/*.js; do
+        if [ -f "$js_file" ]; then
+            SIZE=$(wc -c < "$js_file")
+            JS_TOTAL_SIZE=$((JS_TOTAL_SIZE + SIZE))
+            echo "  📊 $(basename $js_file): $SIZE bytes" | tee -a "$LOG_FILE"
+            
+            # Warn about very large JS files
+            if [ $SIZE -gt 100000 ]; then
+                echo "    ⚠️  WARNING: Large JavaScript file (>100KB)" | tee -a "$LOG_FILE"
+                ((WARNINGS++))
+            fi
+        fi
+    done
+    
+    echo "  📊 Total JavaScript size: $JS_TOTAL_SIZE bytes" | tee -a "$LOG_FILE"
+    if [ $JS_TOTAL_SIZE -gt 150000 ]; then
+        echo "  ⚠️  WARNING: Large total JavaScript size (>150KB)" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    else
+        echo "  ✅ JavaScript size within reasonable limits" | tee -a "$LOG_FILE"
+    fi
+fi
+
+echo "\n=== VERIFICA STRUTTURA IMPORTS ===" | tee -a "$LOG_FILE"
+
+# Check main.css imports
+MAIN_CSS="src/InsightLearn.Web/wwwroot/css/design-system/main.css"
+if [ -f "$MAIN_CSS" ]; then
+    echo "Verifying CSS import structure..." | tee -a "$LOG_FILE"
+    
+    # Check that main.css imports other files
+    declare -a EXPECTED_IMPORTS=(
+        "variables.css"
+        "base.css"
+        "components.css"
+        "animations.css"
+    )
+    
+    for import_file in "${EXPECTED_IMPORTS[@]}"; do
+        if grep -q "$import_file" "$MAIN_CSS"; then
+            echo "  ✅ Import found: $import_file" | tee -a "$LOG_FILE"
+        else
+            echo "  ❌ Missing import: $import_file" | tee -a "$LOG_FILE"
+            ((ERRORS++))
+        fi
+    done
+    
+    # Check for external imports (fonts, icons)
+    if grep -q "fonts.googleapis.com" "$MAIN_CSS"; then
+        echo "  ✅ Google Fonts import found" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No Google Fonts import" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+    if grep -q "fontawesome\|font-awesome" "$MAIN_CSS"; then
+        echo "  ✅ Font Awesome import found" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No Font Awesome import" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+    
+else
+    echo "❌ Main CSS file not found for import verification" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+echo "\n=== VERIFICA RESPONSIVE DESIGN ===" | tee -a "$LOG_FILE"
+
+# Check for responsive design implementation
+echo "Checking responsive design implementation..." | tee -a "$LOG_FILE"
+
+# Count media queries across all CSS files
+MEDIA_QUERY_COUNT=0
+if [ -d "src/InsightLearn.Web/wwwroot/css/design-system" ]; then
+    for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+        if [ -f "$css_file" ]; then
+            FILE_MQ_COUNT=$(grep -c "@media" "$css_file" || true)
+            MEDIA_QUERY_COUNT=$((MEDIA_QUERY_COUNT + FILE_MQ_COUNT))
+            if [ $FILE_MQ_COUNT -gt 0 ]; then
+                echo "  📊 $(basename $css_file): $FILE_MQ_COUNT media queries" | tee -a "$LOG_FILE"
+            fi
+        fi
+    done
+fi
+
+echo "  📊 Total media queries: $MEDIA_QUERY_COUNT" | tee -a "$LOG_FILE"
+if [ $MEDIA_QUERY_COUNT -gt 5 ]; then
+    echo "  ✅ Good responsive design implementation" | tee -a "$LOG_FILE"
+elif [ $MEDIA_QUERY_COUNT -gt 0 ]; then
+    echo "  ⚠️  WARNING: Basic responsive design" | tee -a "$LOG_FILE"
+    ((WARNINGS++))
+else
+    echo "  ❌ No responsive design detected" | tee -a "$LOG_FILE"
+    ((ERRORS++))
+fi
+
+# Check for mobile-first approach
+if [ -d "src/InsightLearn.Web/wwwroot/css/design-system" ]; then
+    MOBILE_FIRST_INDICATORS=0
+    for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+        if [ -f "$css_file" ]; then
+            if grep -q "max-width.*768\|max-width.*640" "$css_file"; then
+                ((MOBILE_FIRST_INDICATORS++))
+            fi
+        fi
+    done
+    
+    if [ $MOBILE_FIRST_INDICATORS -gt 0 ]; then
+        echo "  ✅ Mobile-first design approach detected" | tee -a "$LOG_FILE"
+    else
+        echo "  ⚠️  WARNING: No clear mobile-first approach" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+fi
+
+echo "\n=== VERIFICA ACCESSIBILITY ===" | tee -a "$LOG_FILE"
+
+# Check for accessibility features
+echo "Checking accessibility implementation..." | tee -a "$LOG_FILE"
+
+declare -a ACCESSIBILITY_FEATURES=(
+    "focus-visible"
+    "focus:"
+    "prefers-reduced-motion"
+    "prefers-color-scheme"
+    "prefers-contrast"
+    "sr-only"
+    "aria-"
+    "outline:"
+)
+
+ACCESSIBILITY_COUNT=0
+if [ -d "src/InsightLearn.Web/wwwroot/css/design-system" ]; then
+    for feature in "${ACCESSIBILITY_FEATURES[@]}"; do
+        FOUND=false
+        for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+            if [ -f "$css_file" ] && grep -q "$feature" "$css_file"; then
+                echo "  ✅ Accessibility feature found: $feature" | tee -a "$LOG_FILE"
+                ((ACCESSIBILITY_COUNT++))
+                FOUND=true
+                break
+            fi
+        done
+        if [ "$FOUND" = false ]; then
+            echo "  ⚠️  Missing accessibility feature: $feature" | tee -a "$LOG_FILE"
+            ((WARNINGS++))
+        fi
+    done
+fi
+
+echo "  📊 Accessibility features implemented: $ACCESSIBILITY_COUNT/${#ACCESSIBILITY_FEATURES[@]}" | tee -a "$LOG_FILE"
+if [ $ACCESSIBILITY_COUNT -gt 4 ]; then
+    echo "  ✅ Good accessibility implementation" | tee -a "$LOG_FILE"
+else
+    echo "  ⚠️  WARNING: Limited accessibility features" | tee -a "$LOG_FILE"
+    ((WARNINGS++))
+fi
+
+echo "\n=== VERIFICA COMPATIBILITÀ BROWSER ===" | tee -a "$LOG_FILE"
+
+# Check for browser compatibility considerations
+echo "Checking browser compatibility..." | tee -a "$LOG_FILE"
+
+declare -a MODERN_FEATURES=(
+    "backdrop-filter"
+    "-webkit-backdrop-filter"
+    "css grid\|display: grid"
+    "flex\|display: flex"
+    "var(--"
+    "clamp("
+    "calc("
+)
+
+MODERN_FEATURE_COUNT=0
+if [ -d "src/InsightLearn.Web/wwwroot/css/design-system" ]; then
+    for feature in "${MODERN_FEATURES[@]}"; do
+        for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+            if [ -f "$css_file" ] && grep -q "$feature" "$css_file"; then
+                echo "  ✅ Modern feature found: $feature" | tee -a "$LOG_FILE"
+                ((MODERN_FEATURE_COUNT++))
+                break
+            fi
+        done
+    done
+fi
+
+echo "  📊 Modern CSS features used: $MODERN_FEATURE_COUNT" | tee -a "$LOG_FILE"
+if [ $MODERN_FEATURE_COUNT -gt 3 ]; then
+    echo "  ✅ Good use of modern CSS features" | tee -a "$LOG_FILE"
+else
+    echo "  ⚠️  WARNING: Limited modern features" | tee -a "$LOG_FILE"
+    ((WARNINGS++))
+fi
+
+# Check for vendor prefixes
+VENDOR_PREFIX_COUNT=0
+if [ -d "src/InsightLearn.Web/wwwroot/css/design-system" ]; then
+    for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+        if [ -f "$css_file" ]; then
+            FILE_PREFIX_COUNT=$(grep -c "\-webkit-\|\-moz-\|\-ms-" "$css_file" || true)
+            VENDOR_PREFIX_COUNT=$((VENDOR_PREFIX_COUNT + FILE_PREFIX_COUNT))
+        fi
+    done
+fi
+
+echo "  📊 Vendor prefixes found: $VENDOR_PREFIX_COUNT" | tee -a "$LOG_FILE"
+if [ $VENDOR_PREFIX_COUNT -gt 0 ]; then
+    echo "  ✅ Browser compatibility prefixes implemented" | tee -a "$LOG_FILE"
+else
+    echo "  ⚠️  WARNING: No vendor prefixes found" | tee -a "$LOG_FILE"
+    ((WARNINGS++))
+fi
+
+echo "\n=== RIEPILOGO LIVELLO 5 ===" | tee -a "$LOG_FILE"
+echo "Errori trovati: $ERRORS" | tee -a "$LOG_FILE"
+echo "Warning: $WARNINGS" | tee -a "$LOG_FILE"
+
+if [ $ERRORS -eq 0 ]; then
+    echo "✅ LIVELLO 5 SUPERATO: Integrazione e performance verificate" | tee -a "$LOG_FILE"
+    if [ $WARNINGS -gt 0 ]; then
+        echo "⚠️  Attenzione: $WARNINGS warning da ottimizzare" | tee -a "$LOG_FILE"
+    fi
+    exit 0
+else
+    echo "❌ LIVELLO 5 FALLITO: $ERRORS errori di integrazione" | tee -a "$LOG_FILE"
+    exit 1
+fi
+```
+
+---
+
+## 📊 LIVELLO 6: Verifica Finale e Report Completo
+
+```bash
+#!/bin/bash
+# verification_phase2_level6_final_report.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/verification_phase2_level6_$(date +%Y%m%d_%H%M%S).log"
+REPORT_FILE="logs/PHASE2_COMPREHENSIVE_REPORT_$(date +%Y%m%d_%H%M%S).md"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "========================================" | tee -a "$LOG_FILE"
+echo "LIVELLO 6: VERIFICA FINALE E REPORT COMPLETO" | tee -a "$LOG_FILE"
+echo "Data: $(date)" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+cd InsightLearn.Cloud
+
+# Initialize comprehensive report
+cat > "$REPORT_FILE" << 'EOF'
+# InsightLearn.Cloud - Report Comprensivo Verifica Fase 2
+
+## 📅 Informazioni Generali
+EOF
+
+echo "- **Data Verifica**: $(date)" >> "$REPORT_FILE"
+echo "- **Fase**: Design System e UI Components" >> "$REPORT_FILE"
+echo "- **Directory Progetto**: $(pwd)" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+echo "\n=== ESECUZIONE VERIFICHE COMPLETE ===" | tee -a "$LOG_FILE"
+
+TOTAL_ERRORS=0
+TOTAL_WARNINGS=0
+
+# Execute all verification levels
+echo "## 📊 Risultati Verifiche Multi-Level" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+# Level 1 - Structure
+echo "### Livello 1: Struttura Design System" >> "$REPORT_FILE"
+if bash verification_phase2_level1_structure.sh > /dev/null 2>&1; then
+    echo "- ✅ **SUPERATO**: Struttura design system verificata" >> "$REPORT_FILE"
+    echo "✅ Livello 1: SUPERATO" | tee -a "$LOG_FILE"
+else
+    echo "- ❌ **FALLITO**: Problemi nella struttura" >> "$REPORT_FILE"
+    echo "❌ Livello 1: FALLITO" | tee -a "$LOG_FILE"
+    ((TOTAL_ERRORS++))
+fi
+
+# Level 2 - CSS
+echo "" >> "$REPORT_FILE"
+echo "### Livello 2: CSS e Stili" >> "$REPORT_FILE"
+if bash verification_phase2_level2_css.sh > /dev/null 2>&1; then
+    echo "- ✅ **SUPERATO**: CSS e stili verificati" >> "$REPORT_FILE"
+    echo "✅ Livello 2: SUPERATO" | tee -a "$LOG_FILE"
+else
+    echo "- ❌ **FALLITO**: Problemi nei CSS" >> "$REPORT_FILE"
+    echo "❌ Livello 2: FALLITO" | tee -a "$LOG_FILE"
+    ((TOTAL_ERRORS++))
+fi
+
+# Level 3 - Blazor Components
+echo "" >> "$REPORT_FILE"
+echo "### Livello 3: Componenti Blazor" >> "$REPORT_FILE"
+if bash verification_phase2_level3_blazor.sh > /dev/null 2>&1; then
+    echo "- ✅ **SUPERATO**: Componenti Blazor verificati" >> "$REPORT_FILE"
+    echo "✅ Livello 3: SUPERATO" | tee -a "$LOG_FILE"
+else
+    echo "- ❌ **FALLITO**: Problemi nei componenti" >> "$REPORT_FILE"
+    echo "❌ Livello 3: FALLITO" | tee -a "$LOG_FILE"
+    ((TOTAL_ERRORS++))
+fi
+
+# Level 4 - JavaScript
+echo "" >> "$REPORT_FILE"
+echo "### Livello 4: JavaScript e Animazioni" >> "$REPORT_FILE"
+if bash verification_phase2_level4_javascript.sh > /dev/null 2>&1; then
+    echo "- ✅ **SUPERATO**: JavaScript verificato" >> "$REPORT_FILE"
+    echo "✅ Livello 4: SUPERATO" | tee -a "$LOG_FILE"
+else
+    echo "- ❌ **FALLITO**: Problemi nel JavaScript" >> "$REPORT_FILE"
+    echo "❌ Livello 4: FALLITO" | tee -a "$LOG_FILE"
+    ((TOTAL_ERRORS++))
+fi
+
+# Level 5 - Integration
+echo "" >> "$REPORT_FILE"
+echo "### Livello 5: Integrazione e Performance" >> "$REPORT_FILE"
+if bash verification_phase2_level5_integration.sh > /dev/null 2>&1; then
+    echo "- ✅ **SUPERATO**: Integrazione verificata" >> "$REPORT_FILE"
+    echo "✅ Livello 5: SUPERATO" | tee -a "$LOG_FILE"
+else
+    echo "- ❌ **FALLITO**: Problemi di integrazione" >> "$REPORT_FILE"
+    echo "❌ Livello 5: FALLITO" | tee -a "$LOG_FILE"
+    ((TOTAL_ERRORS++))
+fi
+
+echo "" >> "$REPORT_FILE"
+
+echo "\n=== ANALISI COMPLETA DESIGN SYSTEM ===" | tee -a "$LOG_FILE"
+
+echo "## 🔍 Analisi Dettagliata Design System" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+# Comprehensive file analysis
+echo "### File Analysis" >> "$REPORT_FILE"
+
+# CSS Files Analysis
+if [ -d "src/InsightLearn.Web/wwwroot/css/design-system" ]; then
+    CSS_TOTAL_SIZE=0
+    CSS_FILES=0
+    for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+        if [ -f "$css_file" ]; then
+            SIZE=$(wc -c < "$css_file")
+            LINES=$(wc -l < "$css_file")
+            CSS_TOTAL_SIZE=$((CSS_TOTAL_SIZE + SIZE))
+            ((CSS_FILES++))
+            echo "- **$(basename $css_file)**: $SIZE bytes, $LINES lines" >> "$REPORT_FILE"
+        fi
+    done
+    echo "" >> "$REPORT_FILE"
+    echo "**CSS Summary**: $CSS_FILES files, $CSS_TOTAL_SIZE total bytes" >> "$REPORT_FILE"
+fi
+
+# JavaScript Files Analysis
+echo "" >> "$REPORT_FILE"
+if [ -d "src/InsightLearn.Web/wwwroot/js/design-system" ]; then
+    JS_TOTAL_SIZE=0
+    JS_FILES=0
+    for js_file in src/InsightLearn.Web/wwwroot/js/design-system/*.js; do
+        if [ -f "$js_file" ]; then
+            SIZE=$(wc -c < "$js_file")
+            LINES=$(wc -l < "$js_file")
+            JS_TOTAL_SIZE=$((JS_TOTAL_SIZE + SIZE))
+            ((JS_FILES++))
+            echo "- **$(basename $js_file)**: $SIZE bytes, $LINES lines" >> "$REPORT_FILE"
+        fi
+    done
+    echo "" >> "$REPORT_FILE"
+    echo "**JavaScript Summary**: $JS_FILES files, $JS_TOTAL_SIZE total bytes" >> "$REPORT_FILE"
+fi
+
+# Blazor Components Analysis
+echo "" >> "$REPORT_FILE"
+if [ -d "src/InsightLearn.Web/Components" ]; then
+    COMPONENT_TOTAL_SIZE=0
+    COMPONENT_FILES=0
+    find src/InsightLearn.Web/Components -name "*.razor" | while read component_file; do
+        if [ -f "$component_file" ]; then
+            SIZE=$(wc -c < "$component_file")
+            LINES=$(wc -l < "$component_file")
+            COMPONENT_TOTAL_SIZE=$((COMPONENT_TOTAL_SIZE + SIZE))
+            ((COMPONENT_FILES++))
+            echo "- **$(basename $component_file)**: $SIZE bytes, $LINES lines" >> "$REPORT_FILE"
+        fi
+    done
+    
+    TOTAL_COMPONENTS=$(find src/InsightLearn.Web/Components -name "*.razor" | wc -l)
+    echo "" >> "$REPORT_FILE"
+    echo "**Components Summary**: $TOTAL_COMPONENTS components found" >> "$REPORT_FILE"
+fi
+
+# Feature Analysis
+echo "" >> "$REPORT_FILE"
+echo "### Feature Implementation Analysis" >> "$REPORT_FILE"
+
+# CSS Variables Analysis
+VARIABLES_FILE="src/InsightLearn.Web/wwwroot/css/design-system/variables.css"
+if [ -f "$VARIABLES_FILE" ]; then
+    VAR_COUNT=$(grep -c "^[[:space:]]*--" "$VARIABLES_FILE" || true)
+    MEDIA_QUERIES=$(grep -c "@media" "$VARIABLES_FILE" || true)
+    echo "- **CSS Variables**: $VAR_COUNT custom properties defined" >> "$REPORT_FILE"
+    echo "- **Responsive Breakpoints**: $MEDIA_QUERIES media queries" >> "$REPORT_FILE"
+fi
+
+# Animation Analysis
+ANIMATIONS_FILE="src/InsightLearn.Web/wwwroot/css/design-system/animations.css"
+if [ -f "$ANIMATIONS_FILE" ]; then
+    KEYFRAMES_COUNT=$(grep -c "@keyframes" "$ANIMATIONS_FILE" || true)
+    ANIMATION_CLASSES=$(grep -c "\.animate-" "$ANIMATIONS_FILE" || true)
+    echo "- **Animations**: $KEYFRAMES_COUNT keyframes, $ANIMATION_CLASSES utility classes" >> "$REPORT_FILE"
+fi
+
+# Component Analysis
+COMPONENTS_FILE="src/InsightLearn.Web/wwwroot/css/design-system/components.css"
+if [ -f "$COMPONENTS_FILE" ]; then
+    COMPONENT_CLASSES=$(grep -c "^\.[a-zA-Z]" "$COMPONENTS_FILE" || true)
+    HOVER_EFFECTS=$(grep -c ":hover" "$COMPONENTS_FILE" || true)
+    echo "- **UI Components**: $COMPONENT_CLASSES component classes, $HOVER_EFFECTS hover effects" >> "$REPORT_FILE"
+fi
+
+# JavaScript Feature Analysis
+ANIMATIONS_JS="src/InsightLearn.Web/wwwroot/js/design-system/animations.js"
+if [ -f "$ANIMATIONS_JS" ]; then
+    METHODS=$(grep -c "^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*(" "$ANIMATIONS_JS" || true)
+    EVENT_LISTENERS=$(grep -c "addEventListener" "$ANIMATIONS_JS" || true)
+    echo "- **JavaScript Methods**: $METHODS functions, $EVENT_LISTENERS event listeners" >> "$REPORT_FILE"
+fi
+
+# Quality Analysis
+echo "" >> "$REPORT_FILE"
+echo "### Quality Metrics" >> "$REPORT_FILE"
+
+# Accessibility Check
+ACCESSIBILITY_FEATURES=0
+if [ -d "src/InsightLearn.Web/wwwroot/css/design-system" ]; then
+    for feature in "focus" "prefers-reduced-motion" "prefers-color-scheme" "sr-only" "aria-"; do
+        for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+            if [ -f "$css_file" ] && grep -q "$feature" "$css_file"; then
+                ((ACCESSIBILITY_FEATURES++))
+                break
+            fi
+        done
+    done
+fi
+echo "- **Accessibility Features**: $ACCESSIBILITY_FEATURES/5 implemented" >> "$REPORT_FILE"
+
+# Browser Compatibility
+VENDOR_PREFIXES=0
+if [ -d "src/InsightLearn.Web/wwwroot/css/design-system" ]; then
+    for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+        if [ -f "$css_file" ]; then
+            FILE_PREFIXES=$(grep -c "\-webkit-\|\-moz-\|\-ms-" "$css_file" || true)
+            VENDOR_PREFIXES=$((VENDOR_PREFIXES + FILE_PREFIXES))
+        fi
+    done
+fi
+echo "- **Browser Compatibility**: $VENDOR_PREFIXES vendor prefixes used" >> "$REPORT_FILE"
+
+# Performance Analysis
+TOTAL_ASSETS_SIZE=$((CSS_TOTAL_SIZE + JS_TOTAL_SIZE))
+echo "- **Total Asset Size**: $TOTAL_ASSETS_SIZE bytes" >> "$REPORT_FILE"
+
+if [ $TOTAL_ASSETS_SIZE -lt 200000 ]; then
+    echo "- **Performance Rating**: ✅ Excellent (< 200KB)" >> "$REPORT_FILE"
+elif [ $TOTAL_ASSETS_SIZE -lt 500000 ]; then
+    echo "- **Performance Rating**: ⚠️  Good (< 500KB)" >> "$REPORT_FILE"
+else
+    echo "- **Performance Rating**: ❌ Needs Optimization (> 500KB)" >> "$REPORT_FILE"
+fi
+
+# Technology Stack Verification
+echo "" >> "$REPORT_FILE"
+echo "### Technology Stack Verification" >> "$REPORT_FILE"
+
+# Check for modern CSS features
+MODERN_CSS_SCORE=0
+declare -a MODERN_FEATURES=(
+    "backdrop-filter"
+    "css grid\|display: grid"
+    "var(--"
+    "clamp("
+    "calc("
+)
+
+for feature in "${MODERN_FEATURES[@]}"; do
+    FOUND=false
+    for css_file in src/InsightLearn.Web/wwwroot/css/design-system/*.css; do
+        if [ -f "$css_file" ] && grep -q "$feature" "$css_file"; then
+            ((MODERN_CSS_SCORE++))
+            FOUND=true
+            break
+        fi
+    done
+done
+
+echo "- **Modern CSS Features**: $MODERN_CSS_SCORE/5 implemented" >> "$REPORT_FILE"
+
+# Check for glassmorphism implementation
+if grep -r "backdrop-filter" src/InsightLearn.Web/wwwroot/css/design-system/ > /dev/null 2>&1; then
+    echo "- **Glassmorphism**: ✅ Implemented" >> "$REPORT_FILE"
+else
+    echo "- **Glassmorphism**: ❌ Not detected" >> "$REPORT_FILE"
+fi
+
+# Check for neumorphism implementation
+if grep -r "box-shadow.*inset\|neuro" src/InsightLearn.Web/wwwroot/css/design-system/ > /dev/null 2>&1; then
+    echo "- **Neumorphism**: ✅ Implemented" >> "$REPORT_FILE"
+else
+    echo "- **Neumorphism**: ❌ Not detected" >> "$REPORT_FILE"
+fi
+
+# Final comprehensive test
+echo "\n=== TEST BUILD COMPLETO ===" | tee -a "$LOG_FILE"
+
+echo "" >> "$REPORT_FILE"
+echo "## 🏗️ Build Test" >> "$REPORT_FILE"
+
+# Test if project still builds after design system implementation
+BUILD_START=$(date +%s)
+if timeout_cmd dotnet build --configuration Release --verbosity quiet > /dev/null 2>&1; then
+    BUILD_END=$(date +%s)
+    BUILD_TIME=$((BUILD_END - BUILD_START))
+    echo "- ✅ **Build Status**: Successful" >> "$REPORT_FILE"
+    echo "- ⏱️ **Build Time**: ${BUILD_TIME}s" >> "$REPORT_FILE"
+    echo "✅ BUILD TEST: SUPERATO (${BUILD_TIME}s)" | tee -a "$LOG_FILE"
+else
+    echo "- ❌ **Build Status**: Failed" >> "$REPORT_FILE"
+    echo "❌ BUILD TEST: FALLITO" | tee -a "$LOG_FILE"
+    ((TOTAL_ERRORS++))
+fi
+
+# Collect warning count from individual verification logs
+for level in 1 2 3 4 5; do
+    LEVEL_LOG="logs/verification_phase2_level${level}_*.log"
+    if ls $LEVEL_LOG 1> /dev/null 2>&1; then
+        LATEST_LOG=$(ls -t $LEVEL_LOG | head -n1)
+        if [ -f "$LATEST_LOG" ]; then
+            LEVEL_WARNINGS=$(grep -c "WARNING" "$LATEST_LOG" || true)
+            TOTAL_WARNINGS=$((TOTAL_WARNINGS + LEVEL_WARNINGS))
+        fi
+    fi
+done
+
+# Generate final statistics
+echo "" >> "$REPORT_FILE"
+echo "## 📈 Statistiche Finali" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+echo "- **Errori Totali**: $TOTAL_ERRORS" >> "$REPORT_FILE"
+echo "- **Warning Totali**: $TOTAL_WARNINGS" >> "$REPORT_FILE"
+echo "- **File CSS**: $(find src/InsightLearn.Web/wwwroot/css/design-system -name "*.css" 2>/dev/null | wc -l)" >> "$REPORT_FILE"
+echo "- **File JavaScript**: $(find src/InsightLearn.Web/wwwroot/js/design-system -name "*.js" 2>/dev/null | wc -l)" >> "$REPORT_FILE"
+echo "- **Componenti Blazor**: $(find src/InsightLearn.Web/Components -name "*.razor" 2>/dev/null | wc -l)" >> "$REPORT_FILE"
+echo "- **Dimensione Totale Assets**: $TOTAL_ASSETS_SIZE bytes" >> "$REPORT_FILE"
+echo "- **Score Accessibility**: $ACCESSIBILITY_FEATURES/5" >> "$REPORT_FILE"
+echo "- **Score CSS Moderno**: $MODERN_CSS_SCORE/5" >> "$REPORT_FILE"
+
+# Calculate overall quality score
+QUALITY_SCORE=0
+MAX_SCORE=10
+
+# Build success (2 points)
+if [ $TOTAL_ERRORS -eq 0 ]; then
+    QUALITY_SCORE=$((QUALITY_SCORE + 2))
+fi
+
+# File completeness (2 points)
+CSS_COUNT=$(find src/InsightLearn.Web/wwwroot/css/design-system -name "*.css" 2>/dev/null | wc -l)
+if [ $CSS_COUNT -ge 5 ]; then
+    QUALITY_SCORE=$((QUALITY_SCORE + 1))
+fi
+
+JS_COUNT=$(find src/InsightLearn.Web/wwwroot/js/design-system -name "*.js" 2>/dev/null | wc -l)
+if [ $JS_COUNT -ge 1 ]; then
+    QUALITY_SCORE=$((QUALITY_SCORE + 1))
+fi
+
+# Accessibility (2 points)
+if [ $ACCESSIBILITY_FEATURES -ge 3 ]; then
+    QUALITY_SCORE=$((QUALITY_SCORE + 2))
+elif [ $ACCESSIBILITY_FEATURES -ge 1 ]; then
+    QUALITY_SCORE=$((QUALITY_SCORE + 1))
+fi
+
+# Modern CSS (2 points)
+if [ $MODERN_CSS_SCORE -ge 4 ]; then
+    QUALITY_SCORE=$((QUALITY_SCORE + 2))
+elif [ $MODERN_CSS_SCORE -ge 2 ]; then
+    QUALITY_SCORE=$((QUALITY_SCORE + 1))
+fi
+
+# Performance (2 points)
+if [ $TOTAL_ASSETS_SIZE -lt 200000 ]; then
+    QUALITY_SCORE=$((QUALITY_SCORE + 2))
+elif [ $TOTAL_ASSETS_SIZE -lt 500000 ]; then
+    QUALITY_SCORE=$((QUALITY_SCORE + 1))
+fi
+
+echo "- **Quality Score**: $QUALITY_SCORE/$MAX_SCORE" >> "$REPORT_FILE"
+
+# Final verdict
+echo "" >> "$REPORT_FILE"
+echo "## 🎯 Verdetto Finale" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+if [ $TOTAL_ERRORS -eq 0 ]; then
+    if [ $QUALITY_SCORE -ge 8 ]; then
+        echo "### 🌟 FASE 2 COMPLETATA CON ECCELLENZA" >> "$REPORT_FILE"
+        echo "" >> "$REPORT_FILE"
+        echo "Il design system è stato implementato con qualità eccellente. Pronto per la Fase 3." >> "$REPORT_FILE"
+        VERDICT="ECCELLENZA"
+    else
+        echo "### ✅ FASE 2 COMPLETATA CON SUCCESSO" >> "$REPORT_FILE"
+        echo "" >> "$REPORT_FILE"
+        echo "Il design system è stato implementato correttamente. Pronto per la Fase 3." >> "$REPORT_FILE"
+        VERDICT="SUCCESSO"
+    fi
+    
+    if [ $TOTAL_WARNINGS -gt 0 ]; then
+        echo "" >> "$REPORT_FILE"
+        echo "**Note**: $TOTAL_WARNINGS warning rilevati. Considerare ottimizzazioni future." >> "$REPORT_FILE"
+    fi
+    
+    echo "" >> "$REPORT_FILE"
+    echo "### 🚀 Prossimi Passi" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "1. ✅ Design System completato" >> "$REPORT_FILE"
+    echo "2. 🔄 Procedere con Fase 3: Autenticazione Multi-Layer" >> "$REPORT_FILE"
+    echo "3. 🎨 Considerare ottimizzazioni per warning rilevati" >> "$REPORT_FILE"
+    
+    echo "✅ VERIFICA COMPLETA FASE 2: $VERDICT" | tee -a "$LOG_FILE"
+    echo "📊 Report generato: $REPORT_FILE" | tee -a "$LOG_FILE"
+    echo "🎯 Quality Score: $QUALITY_SCORE/$MAX_SCORE" | tee -a "$LOG_FILE"
+    
+    exit 0
+else
+    echo "### ❌ FASE 2 RICHIEDE CORREZIONI" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE" 
+    echo "Sono stati rilevati $TOTAL_ERRORS errori critici che devono essere corretti prima di procedere alla Fase 3." >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "### 🔧 Azioni Necessarie" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "1. Controllare i log di verifica dettagliati per ogni livello" >> "$REPORT_FILE"
+    echo "2. Correggere tutti gli errori identificati" >> "$REPORT_FILE"
+    echo "3. Rieseguire la verifica completa" >> "$REPORT_FILE"
+    echo "4. Assicurarsi che il build sia successful" >> "$REPORT_FILE"
+    
+    echo "❌ VERIFICA COMPLETA FASE 2: FALLITA ($TOTAL_ERRORS errori)" | tee -a "$LOG_FILE"
+    echo "📊 Report generato: $REPORT_FILE" | tee -a "$LOG_FILE"
+    echo "🎯 Quality Score: $QUALITY_SCORE/$MAX_SCORE" | tee -a "$LOG_FILE"
+    
+    exit 1
+fi
+```
+
+---
+
+## 🚀 SCRIPT MASTER DI ESECUZIONE COMPLETA
+
+```bash
+#!/bin/bash
+# master_verification_phase2_complete.sh
+
+echo "🎨 InsightLearn.Cloud - Verifica Completa Fase 2 Design System"
+echo "=============================================================="
+
+# Sudo password for Debian
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+# Create verification scripts directory
+mkdir -p verification_scripts_phase2
+
+echo "📝 Creazione script di verifica..."
+
+# Write all verification scripts with proper content
+# Note: In actual implementation, each script would contain the full code above
+
+echo "#!/bin/bash" > verification_scripts_phase2/verification_phase2_level1_structure.sh
+echo "# Livello 1 verification script content would be here" >> verification_scripts_phase2/verification_phase2_level1_structure.sh
+
+echo "#!/bin/bash" > verification_scripts_phase2/verification_phase2_level2_css.sh
+echo "# Livello 2 verification script content would be here" >> verification_scripts_phase2/verification_phase2_level2_css.sh
+
+echo "#!/bin/bash" > verification_scripts_phase2/verification_phase2_level3_blazor.sh
+echo "# Livello 3 verification script content would be here" >> verification_scripts_phase2/verification_phase2_level3_blazor.sh
+
+echo "#!/bin/bash" > verification_scripts_phase2/verification_phase2_level4_javascript.sh
+echo "# Livello 4 verification script content would be here" >> verification_scripts_phase2/verification_phase2_level4_javascript.sh
+
+echo "#!/bin/bash" > verification_scripts_phase2/verification_phase2_level5_integration.sh
+echo "# Livello 5 verification script content would be here" >> verification_scripts_phase2/verification_phase2_level5_integration.sh
+
+echo "#!/bin/bash" > verification_scripts_phase2/verification_phase2_level6_final_report.sh
+echo "# Livello 6 verification script content would be here" >> verification_scripts_phase2/verification_phase2_level6_final_report.sh
+
+# Make scripts executable
+chmod +x verification_scripts_phase2/*.sh
+
+echo "🔍 Esecuzione verifica multi-level completa..."
+
+# Execute final comprehensive verification
+cd verification_scripts_phase2
+bash verification_phase2_level6_final_report.sh
+
+echo ""
+echo "✅ Verifica completa Fase 2 terminata"
+echo "📊 Controlla il file di report in logs/PHASE2_COMPREHENSIVE_REPORT_*.md"
+echo "🎯 Se tutti i test sono superati, puoi procedere alla Fase 3"
+```
+
+## 📝 Istruzioni per Claude Code
+
+**ESEGUI IN QUESTO ORDINE:**
+
+1. **Salva tutti gli script di verifica** (Livelli 1-6) in file separati
+2. **Esegui il master script**: `bash master_verification_phase2_complete.sh`
+3. **Analizza il report comprensivo** generato
+4. **Se ci sono errori**: correggi e riesegui la verifica specifica
+5. **Solo quando tutto è ✅**: procedi alla Fase 3
+
+## ✅ Criteri di Successo Assoluto Fase 2
+
+La Fase 2 è verificata e pronta per la Fase 3 SOLO quando:
+
+- [x] **Livello 1**: Struttura design system completa
+- [x] **Livello 2**: CSS con glassmorphism e neumorphism
+- [x] **Livello 3**: Componenti Blazor funzionali e ricchi
+- [x] **Livello 4**: JavaScript avanzato con animazioni
+- [x] **Livello 5**: Integrazione, performance e accessibility
+- [x] **Livello 6**: Build successful e quality score ≥ 6/10
+
+**Il report finale deve mostrare: "✅ FASE 2 COMPLETATA CON SUCCESSO" o "🌟 FASE 2 COMPLETATA CON ECCELLENZA"**

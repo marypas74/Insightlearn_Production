@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-wrapper-service
+  namespace: insightlearn-ai
+  labels:
+    app: ai-wrapper
+    component: api-service
+    service-type: internal
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: ai-wrapper
+  sessionAffinity: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-wrapper-external
+  namespace: insightlearn-ai
+  labels:
+    app: ai-wrapper
+    component: api-service
+    service-type: nodeport
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30080
+    protocol: TCP
+    name: http
+  selector:
+    app: ai-wrapper
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-wrapper-ingress
+  namespace: insightlearn-ai
+  labels:
+    app: ai-wrapper
+    component: api-service
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ai.insightlearn.cloud
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-wrapper-service
+            port:
+              number: 8080
+  tls:
+  - hosts:
+    - ai.insightlearn.cloud
+    secretName: ai-wrapper-tls
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ai-wrapper-tls
+  namespace: insightlearn-ai
+  labels:
+    app: ai-wrapper
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0t

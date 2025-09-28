@@ -1,0 +1,11 @@
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/bin/Release/net8.0/InsightLearn.Infrastructure.deps.json
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/bin/Release/net8.0/InsightLearn.Infrastructure.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/bin/Release/net8.0/InsightLearn.Infrastructure.pdb
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Release/net8.0/InsightLearn.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Release/net8.0/InsightLearn.Infrastructure.AssemblyInfoInputs.cache
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Release/net8.0/InsightLearn.Infrastructure.AssemblyInfo.cs
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Release/net8.0/InsightLearn.Infrastructure.csproj.CoreCompileInputs.cache
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Release/net8.0/InsightLearn.Infrastructure.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Release/net8.0/refint/InsightLearn.Infrastructure.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Release/net8.0/InsightLearn.Infrastructure.pdb
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Release/net8.0/ref/InsightLearn.Infrastructure.dll

@@ -1,0 +1,17 @@
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/InsightLearn.Infrastructure.csproj.AssemblyReference.cache
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/InsightLearn.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/InsightLearn.Infrastructure.AssemblyInfoInputs.cache
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/InsightLearn.Infrastructure.AssemblyInfo.cs
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/InsightLearn.Infrastructure.csproj.CoreCompileInputs.cache
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/bin/Debug/net8.0/InsightLearn.Infrastructure.deps.json
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/bin/Debug/net8.0/InsightLearn.Infrastructure.runtimeconfig.json
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/bin/Debug/net8.0/InsightLearn.Infrastructure.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/bin/Debug/net8.0/InsightLearn.Infrastructure.pdb
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/bin/Debug/net8.0/InsightLearn.Core.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/bin/Debug/net8.0/InsightLearn.Core.pdb
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/InsightL.76BE8D31.Up2Date
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/InsightLearn.Infrastructure.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/refint/InsightLearn.Infrastructure.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/InsightLearn.Infrastructure.pdb
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/InsightLearn.Infrastructure.genruntimeconfig.cache
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/obj/Debug/net8.0/ref/InsightLearn.Infrastructure.dll

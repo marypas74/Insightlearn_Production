@@ -1,0 +1,37 @@
+name: Deploy to Kubernetes
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore src/InsightLearn.Web/InsightLearn.Web/InsightLearn.Web.csproj
+
+    - name: Build
+      run: dotnet build src/InsightLearn.Web/InsightLearn.Web/InsightLearn.Web.csproj --no-restore
+
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+
+    - name: Build Docker image
+      run: docker build . -t insightlearn-web:${{ github.sha }}
+
+    - name: Deploy to Kubernetes (if on main)
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "Would deploy to Kubernetes here"
+        # kubectl apply -f kubernetes/

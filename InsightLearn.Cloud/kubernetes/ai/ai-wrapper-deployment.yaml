@@ -1,0 +1,269 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-wrapper-config
+  namespace: insightlearn-ai
+data:
+  config.yaml: |
+    server:
+      port: 8080
+      host: "0.0.0.0"
+    ollama:
+      url: "http://ollama-service:11434"
+      timeout: "300s"
+    models:
+      general_qa: "llama2:7b"
+      code_assistance: "codellama"
+      content_analysis: "mistral"
+    features:
+      course_recommendations: true
+      content_analysis: true
+      chat_qa: true
+      learning_path_optimization: true
+    logging:
+      level: "info"
+      format: "json"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-wrapper
+  namespace: insightlearn-ai
+  labels:
+    app: ai-wrapper
+    component: api-service
+    version: v1
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ai-wrapper
+  template:
+    metadata:
+      labels:
+        app: ai-wrapper
+        component: api-service
+        version: v1
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: ai-wrapper
+        image: python:3.11-slim
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+          name: http
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: OLLAMA_BASE_URL
+          value: "http://ollama-service:11434"
+        - name: PORT
+          value: "8080"
+        - name: ENVIRONMENT
+          value: "production"
+        command: ["/bin/bash"]
+        args:
+          - -c
+          - |
+            pip install --no-cache-dir fastapi uvicorn httpx pydantic python-multipart aiofiles
+            cat > /app/main.py << 'EOF'
+            from fastapi import FastAPI, HTTPException, BackgroundTasks
+            from pydantic import BaseModel
+            from typing import List, Optional, Dict, Any
+            import httpx
+            import json
+            import asyncio
+            import logging
+            import os
+
+            logging.basicConfig(level=logging.INFO)
+            logger = logging.getLogger(__name__)
+
+            app = FastAPI(
+                title="InsightLearn AI Wrapper",
+                description="AI services wrapper for InsightLearn.Cloud",
+                version="1.0.0"
+            )
+
+            OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama-service:11434")
+
+            class CourseRecommendationRequest(BaseModel):
+                user_id: str
+                preferences: Dict[str, Any]
+                learning_history: List[str] = []
+                skill_level: str = "beginner"
+
+            class ContentAnalysisRequest(BaseModel):
+                content: str
+                content_type: str = "text"
+                analysis_type: List[str] = ["difficulty", "topics", "prerequisites"]
+
+            class ChatRequest(BaseModel):
+                message: str
+                context: Optional[str] = None
+                model: Optional[str] = "llama2:7b"
+
+            class LearningPathRequest(BaseModel):
+                user_id: str
+                target_skills: List[str]
+                current_skills: List[str] = []
+                timeframe_weeks: int = 12
+
+            async def call_ollama(prompt: str, model: str = "llama2:7b") -> str:
+                async with httpx.AsyncClient(timeout=300.0) as client:
+                    try:
+                        response = await client.post(
+                            f"{OLLAMA_BASE_URL}/api/generate",
+                            json={
+                                "model": model,
+                                "prompt": prompt,
+                                "stream": False
+                            }
+                        )
+                        response.raise_for_status()
+                        return response.json().get("response", "")
+                    except Exception as e:
+                        logger.error(f"Error calling Ollama: {e}")
+                        raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
+
+            @app.get("/health")
+            async def health_check():
+                return {"status": "healthy", "service": "ai-wrapper"}
+
+            @app.get("/models")
+            async def list_models():
+                async with httpx.AsyncClient() as client:
+                    try:
+                        response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+                        return response.json()
+                    except Exception as e:
+                        return {"error": str(e), "available_models": []}
+
+            @app.post("/api/v1/course-recommendations")
+            async def get_course_recommendations(request: CourseRecommendationRequest):
+                prompt = f"""
+                Generate personalized course recommendations for a user with the following profile:
+                - User ID: {request.user_id}
+                - Skill Level: {request.skill_level}
+                - Preferences: {json.dumps(request.preferences)}
+                - Learning History: {', '.join(request.learning_history)}
+
+                Please provide 3-5 course recommendations with explanations for why each course fits their profile.
+                Format the response as JSON with course titles, descriptions, difficulty levels, and reasoning.
+                """
+
+                response = await call_ollama(prompt, "llama2:7b")
+                return {"recommendations": response, "user_id": request.user_id}
+
+            @app.post("/api/v1/content-analysis")
+            async def analyze_content(request: ContentAnalysisRequest):
+                prompt = f"""
+                Analyze the following {request.content_type} content for: {', '.join(request.analysis_type)}
+
+                Content:
+                {request.content}
+
+                Provide analysis results in JSON format covering the requested analysis types.
+                """
+
+                response = await call_ollama(prompt, "mistral")
+                return {"analysis": response, "content_type": request.content_type}
+
+            @app.post("/api/v1/chat")
+            async def chat_endpoint(request: ChatRequest):
+                context_prompt = ""
+                if request.context:
+                    context_prompt = f"Context: {request.context}\n\n"
+
+                prompt = f"{context_prompt}User: {request.message}\nAssistant:"
+                response = await call_ollama(prompt, request.model)
+                return {"response": response, "model": request.model}
+
+            @app.post("/api/v1/learning-path")
+            async def optimize_learning_path(request: LearningPathRequest):
+                prompt = f"""
+                Create an optimized learning path for:
+                - Target Skills: {', '.join(request.target_skills)}
+                - Current Skills: {', '.join(request.current_skills)}
+                - Timeframe: {request.timeframe_weeks} weeks
+                - User ID: {request.user_id}
+
+                Design a week-by-week learning plan with milestones, resources, and progress checkpoints.
+                Format as JSON with weekly objectives and recommended study time.
+                """
+
+                response = await call_ollama(prompt, "llama2:7b")
+                return {"learning_path": response, "user_id": request.user_id, "timeframe_weeks": request.timeframe_weeks}
+
+            @app.post("/api/v1/code-assistance")
+            async def code_assistance(request: dict):
+                code = request.get("code", "")
+                language = request.get("language", "python")
+                task = request.get("task", "review")
+
+                prompt = f"""
+                Provide {task} assistance for the following {language} code:
+
+                {code}
+
+                Please provide detailed feedback, suggestions, and improvements.
+                """
+
+                response = await call_ollama(prompt, "codellama")
+                return {"assistance": response, "language": language, "task": task}
+
+            if __name__ == "__main__":
+                import uvicorn
+                uvicorn.run(app, host="0.0.0.0", port=8080)
+            EOF
+
+            cd /app && python main.py
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ai-wrapper-config
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30

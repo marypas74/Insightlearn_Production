@@ -1,0 +1,507 @@
+
+<div class="video-player-container">
+    <div class="video-wrapper">
+        <video @ref="videoElement"
+               class="video-element"
+               controls="@ShowControls"
+               autoplay="@AutoPlay"
+               muted="@Muted"
+               loop="@Loop"
+               preload="@PreloadType"
+               poster="@ThumbnailUrl"
+               @ontimeupdate="OnTimeUpdate"
+               @onloadedmetadata="OnMetadataLoaded"
+               @onplay="OnPlay"
+               @onpause="OnPause"
+               @onended="OnEnded"
+               @onvolumechange="OnVolumeChange">
+
+            @if (!string.IsNullOrEmpty(VideoUrl))
+            {
+                <source src="@VideoUrl" type="video/mp4">
+            }
+
+            @foreach (var subtitle in Subtitles)
+            {
+                <track kind="subtitles"
+                       src="@subtitle.Url"
+                       srclang="@subtitle.Language"
+                       label="@subtitle.Label"
+                       default="@subtitle.IsDefault">
+            }
+
+            Your browser does not support the video tag.
+        </video>
+
+        @if (ShowCustomControls)
+        {
+            <div class="custom-controls">
+                <div class="controls-row">
+                    <button class="control-btn play-pause-btn" @onclick="TogglePlayPause">
+                        @if (IsPlaying)
+                        {
+                            <span class="icon">⏸</span>
+                        }
+                        else
+                        {
+                            <span class="icon">▶</span>
+                        }
+                    </button>
+
+                    <div class="time-display">
+                        <span>@FormatTime(CurrentTime)</span>
+                        <span>/</span>
+                        <span>@FormatTime(Duration)</span>
+                    </div>
+
+                    <input type="range"
+                           class="progress-slider"
+                           min="0"
+                           max="@Duration.TotalSeconds"
+                           value="@CurrentTime.TotalSeconds"
+                           @onchange="OnSeek" />
+
+                    <div class="volume-control">
+                        <button class="control-btn volume-btn" @onclick="ToggleMute">
+                            @if (IsMuted || Volume == 0)
+                            {
+                                <span class="icon">🔇</span>
+                            }
+                            else if (Volume < 0.5)
+                            {
+                                <span class="icon">🔉</span>
+                            }
+                            else
+                            {
+                                <span class="icon">🔊</span>
+                            }
+                        </button>
+                        <input type="range"
+                               class="volume-slider"
+                               min="0"
+                               max="1"
+                               step="0.1"
+                               value="@Volume"
+                               @onchange="OnVolumeChangedInternal" />
+                    </div>
+
+                    @if (QualityLevels.Any())
+                    {
+                        <select class="quality-selector" @onchange="OnQualityChanged">
+                            @foreach (var quality in QualityLevels)
+                            {
+                                <option value="@quality.Value" selected="@(quality.Value == CurrentQuality)">
+                                    @quality.Label
+                                </option>
+                            }
+                        </select>
+                    }
+
+                    <button class="control-btn fullscreen-btn" @onclick="ToggleFullscreen">
+                        <span class="icon">⛶</span>
+                    </button>
+                </div>
+
+                @if (ShowProgressPreview && PreviewThumbnail != null)
+                {
+                    <div class="progress-preview" style="left: @(PreviewPosition)px">
+                        <img src="@PreviewThumbnail.Url" alt="Preview" />
+                        <span>@FormatTime(PreviewTime)</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (ShowPlaylist && Playlist.Any())
+    {
+        <div class="video-playlist">
+            <h4>Playlist</h4>
+            @foreach (var video in Playlist)
+            {
+                <div class="playlist-item @(video.Id == CurrentVideoId ? "active" : "")"
+                     @onclick="() => LoadVideo(video)">
+                    <img src="@video.ThumbnailUrl" alt="@video.Title" class="playlist-thumbnail" />
+                    <div class="playlist-info">
+                        <h5>@video.Title</h5>
+                        <span>@FormatTime(video.Duration)</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string VideoUrl { get; set; } = string.Empty;
+    [Parameter] public string ThumbnailUrl { get; set; } = string.Empty;
+    [Parameter] public bool ShowControls { get; set; } = true;
+    [Parameter] public bool ShowCustomControls { get; set; } = false;
+    [Parameter] public bool AutoPlay { get; set; } = false;
+    [Parameter] public bool Muted { get; set; } = false;
+    [Parameter] public bool Loop { get; set; } = false;
+    [Parameter] public string PreloadType { get; set; } = "metadata";
+    [Parameter] public List<VideoSubtitle> Subtitles { get; set; } = new();
+    [Parameter] public List<VideoQualityLevel> QualityLevels { get; set; } = new();
+    [Parameter] public List<VideoDto> Playlist { get; set; } = new();
+    [Parameter] public bool ShowPlaylist { get; set; } = false;
+    [Parameter] public bool ShowProgressPreview { get; set; } = false;
+    [Parameter] public int CurrentVideoId { get; set; }
+
+    [Parameter] public EventCallback<TimeSpan> OnTimeChanged { get; set; }
+    [Parameter] public EventCallback<bool> OnPlayStateChanged { get; set; }
+    [Parameter] public EventCallback<double> OnVolumeChanged { get; set; }
+    [Parameter] public EventCallback<VideoDto> OnVideoChanged { get; set; }
+
+    private ElementReference videoElement;
+    private TimeSpan CurrentTime = TimeSpan.Zero;
+    private TimeSpan Duration = TimeSpan.Zero;
+    private bool IsPlaying = false;
+    private bool IsMuted = false;
+    private double Volume = 1.0;
+    private string CurrentQuality = "auto";
+    private VideoThumbnailPreview? PreviewThumbnail;
+    private TimeSpan PreviewTime = TimeSpan.Zero;
+    private double PreviewPosition = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task TogglePlayPause()
+    {
+        if (IsPlaying)
+        {
+            await videoElement.FocusAsync();
+            // Pause video logic
+            IsPlaying = false;
+        }
+        else
+        {
+            await videoElement.FocusAsync();
+            // Play video logic
+            IsPlaying = true;
+        }
+
+        await OnPlayStateChanged.InvokeAsync(IsPlaying);
+        StateHasChanged();
+    }
+
+    private async Task OnSeek(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var seconds))
+        {
+            CurrentTime = TimeSpan.FromSeconds(seconds);
+            // Seek video to this position
+            await OnTimeChanged.InvokeAsync(CurrentTime);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnVolumeChangedInternal(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var volume))
+        {
+            Volume = volume;
+            IsMuted = volume == 0;
+            await OnVolumeChanged.InvokeAsync(Volume);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleMute()
+    {
+        IsMuted = !IsMuted;
+        Volume = IsMuted ? 0 : 1.0;
+        await OnVolumeChanged.InvokeAsync(Volume);
+        StateHasChanged();
+    }
+
+    private async Task OnQualityChanged(ChangeEventArgs e)
+    {
+        CurrentQuality = e.Value?.ToString() ?? "auto";
+        // Change video quality logic
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private async Task ToggleFullscreen()
+    {
+        // Toggle fullscreen logic
+        await videoElement.FocusAsync();
+    }
+
+    private async Task LoadVideo(VideoDto video)
+    {
+        CurrentVideoId = video.Id;
+        VideoUrl = $"/api/videos/{video.Id}/stream";
+        ThumbnailUrl = video.ThumbnailUrl;
+        await OnVideoChanged.InvokeAsync(video);
+        StateHasChanged();
+    }
+
+    private async Task OnTimeUpdate()
+    {
+        // Called when video time updates
+        await OnTimeChanged.InvokeAsync(CurrentTime);
+    }
+
+    private async Task OnMetadataLoaded()
+    {
+        // Called when video metadata is loaded
+        await Task.CompletedTask;
+    }
+
+    private async Task OnPlay()
+    {
+        IsPlaying = true;
+        await OnPlayStateChanged.InvokeAsync(IsPlaying);
+        StateHasChanged();
+    }
+
+    private async Task OnPause()
+    {
+        IsPlaying = false;
+        await OnPlayStateChanged.InvokeAsync(IsPlaying);
+        StateHasChanged();
+    }
+
+    private async Task OnEnded()
+    {
+        IsPlaying = false;
+        await OnPlayStateChanged.InvokeAsync(IsPlaying);
+
+        // Auto-play next video in playlist if available
+        if (ShowPlaylist && Playlist.Any())
+        {
+            var currentIndex = Playlist.FindIndex(v => v.Id == CurrentVideoId);
+            if (currentIndex >= 0 && currentIndex < Playlist.Count - 1)
+            {
+                await LoadVideo(Playlist[currentIndex + 1]);
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task OnVolumeChange()
+    {
+        await OnVolumeChanged.InvokeAsync(Volume);
+    }
+
+    private string FormatTime(TimeSpan time)
+    {
+        return time.TotalHours >= 1
+            ? time.ToString(@"h\:mm\:ss")
+            : time.ToString(@"m\:ss");
+    }
+
+    public class VideoSubtitle
+    {
+        public string Url { get; set; } = string.Empty;
+        public string Language { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public bool IsDefault { get; set; }
+    }
+
+    public class VideoQualityLevel
+    {
+        public string Value { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+    }
+
+    public class VideoThumbnailPreview
+    {
+        public string Url { get; set; } = string.Empty;
+        public TimeSpan Position { get; set; }
+    }
+
+    public class VideoDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string ThumbnailUrl { get; set; } = string.Empty;
+        public TimeSpan Duration { get; set; }
+    }
+}
+
+<style>
+.video-player-container {
+    position: relative;
+    max-width: 100%;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.video-wrapper {
+    position: relative;
+    width: 100%;
+    background: #000;
+}
+
+.video-element {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.custom-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    padding: 20px 15px 15px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.video-wrapper:hover .custom-controls {
+    opacity: 1;
+}
+
+.controls-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+}
+
+.control-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.control-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.time-display {
+    display: flex;
+    gap: 5px;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 100px;
+}
+
+.progress-slider {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.volume-slider {
+    width: 60px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    outline: none;
+}
+
+.quality-selector {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.progress-preview {
+    position: absolute;
+    bottom: 60px;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.progress-preview img {
+    width: 120px;
+    height: 68px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+.video-playlist {
+    background: #f5f5f5;
+    padding: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.video-playlist h4 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 16px;
+}
+
+.playlist-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    margin-bottom: 5px;
+}
+
+.playlist-item:hover {
+    background-color: #e0e0e0;
+}
+
+.playlist-item.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.playlist-thumbnail {
+    width: 60px;
+    height: 34px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.playlist-info h5 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+.playlist-info span {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.icon {
+    font-size: 16px;
+    display: inline-block;
+}
+</style>

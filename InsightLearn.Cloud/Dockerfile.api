@@ -1,0 +1,31 @@
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy all project files
+COPY ["src/InsightLearn.Api/InsightLearn.Api/InsightLearn.Api.csproj", "InsightLearn.Api/InsightLearn.Api/"]
+COPY ["src/InsightLearn.Core/InsightLearn.Core/InsightLearn.Core.csproj", "InsightLearn.Core/InsightLearn.Core/"]
+COPY ["src/InsightLearn.Infrastructure/InsightLearn.Infrastructure/InsightLearn.Infrastructure.csproj", "InsightLearn.Infrastructure/InsightLearn.Infrastructure/"]
+COPY ["src/InsightLearn.AI/InsightLearn.AI/InsightLearn.AI.csproj", "InsightLearn.AI/InsightLearn.AI/"]
+
+# Restore packages
+RUN dotnet restore "InsightLearn.Api/InsightLearn.Api/InsightLearn.Api.csproj"
+
+# Copy source code
+COPY src/ .
+
+# Build
+WORKDIR "/src/InsightLearn.Api/InsightLearn.Api"
+RUN dotnet build "InsightLearn.Api.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "InsightLearn.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "InsightLearn.Api.dll"]

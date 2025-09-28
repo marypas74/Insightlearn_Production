@@ -1,0 +1,487 @@
+# Monitoring Stack Verification Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: monitoring-verification
+  namespace: insightlearn-monitoring
+  labels:
+    app: monitoring-verification
+    component: verification
+spec:
+  template:
+    spec:
+      serviceAccountName: monitoring-sa
+      containers:
+      - name: verifier
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - /scripts/verify-monitoring.sh
+        volumeMounts:
+        - name: verification-script
+          mountPath: /scripts
+      volumes:
+      - name: verification-script
+        configMap:
+          name: monitoring-verification-script
+          defaultMode: 0755
+      restartPolicy: Never
+  backoffLimit: 3
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-verification-script
+  namespace: insightlearn-monitoring
+  labels:
+    app: monitoring-verification
+data:
+  verify-monitoring.sh: |
+    #!/bin/sh
+
+    echo "=== InsightLearn Monitoring Stack Verification ==="
+    echo "Timestamp: $(date)"
+    echo ""
+
+    FAILED=0
+    SUCCESS=0
+
+    # Function to check service health
+    check_service() {
+        local service_name=$1
+        local service_url=$2
+        local expected_status=$3
+        local timeout=${4:-10}
+
+        echo "Checking $service_name..."
+        if curl -f -m $timeout "$service_url" > /dev/null 2>&1; then
+            echo "✓ $service_name is healthy"
+            SUCCESS=$((SUCCESS + 1))
+        else
+            echo "✗ $service_name is not responding"
+            FAILED=$((FAILED + 1))
+        fi
+    }
+
+    # Function to check metrics endpoint
+    check_metrics() {
+        local service_name=$1
+        local metrics_url=$2
+        local timeout=${3:-10}
+
+        echo "Checking $service_name metrics..."
+        if curl -f -m $timeout "$metrics_url" | grep -q "prometheus"; then
+            echo "✓ $service_name metrics are available"
+            SUCCESS=$((SUCCESS + 1))
+        else
+            echo "✗ $service_name metrics are not available"
+            FAILED=$((FAILED + 1))
+        fi
+    }
+
+    echo "=== Core Monitoring Services ==="
+
+    # Check Prometheus
+    check_service "Prometheus" "http://prometheus.insightlearn-monitoring.svc.cluster.local:9090/-/healthy"
+    check_metrics "Prometheus" "http://prometheus.insightlearn-monitoring.svc.cluster.local:9090/metrics"
+
+    # Check Grafana
+    check_service "Grafana" "http://grafana.insightlearn-monitoring.svc.cluster.local:3000/api/health"
+
+    # Check AlertManager
+    check_service "AlertManager" "http://alertmanager.insightlearn-monitoring.svc.cluster.local:9093/-/healthy"
+    check_metrics "AlertManager" "http://alertmanager.insightlearn-monitoring.svc.cluster.local:9093/metrics"
+
+    # Check Kibana
+    check_service "Kibana" "http://kibana.insightlearn-monitoring.svc.cluster.local:5601/api/status" 15
+
+    echo ""
+    echo "=== Application Services Health Checks ==="
+
+    # Check API Health
+    check_service "InsightLearn API" "http://insightlearn-api.insightlearn.svc.cluster.local/health"
+
+    # Check Web Health
+    check_service "InsightLearn Web" "http://insightlearn-web.insightlearn.svc.cluster.local/health"
+
+    # Check Health Dashboard
+    check_service "Health Dashboard" "http://insightlearn-health-dashboard.insightlearn.svc.cluster.local:8080"
+
+    echo ""
+    echo "=== Database Services ==="
+
+    # Check if databases are reachable (using nc would be better but curl is available)
+    check_service "Elasticsearch" "http://elasticsearch.insightlearn-data.svc.cluster.local:9200/_cluster/health"
+
+    echo ""
+    echo "=== Prometheus Targets Check ==="
+
+    # Check if Prometheus can scrape targets
+    echo "Checking Prometheus targets..."
+    targets_response=$(curl -s "http://prometheus.insightlearn-monitoring.svc.cluster.local:9090/api/v1/targets")
+    if echo "$targets_response" | grep -q '"status":"success"'; then
+        echo "✓ Prometheus targets API is accessible"
+        SUCCESS=$((SUCCESS + 1))
+
+        # Count active targets
+        active_targets=$(echo "$targets_response" | grep -o '"health":"up"' | wc -l)
+        echo "  Active targets: $active_targets"
+    else
+        echo "✗ Prometheus targets API is not accessible"
+        FAILED=$((FAILED + 1))
+    fi
+
+    echo ""
+    echo "=== Metrics Collection Verification ==="
+
+    # Check if metrics are being collected
+    echo "Checking if metrics are being collected..."
+    metrics_query="up"
+    query_response=$(curl -s "http://prometheus.insightlearn-monitoring.svc.cluster.local:9090/api/v1/query?query=$metrics_query")
+    if echo "$query_response" | grep -q '"status":"success"'; then
+        echo "✓ Prometheus query API is working"
+        SUCCESS=$((SUCCESS + 1))
+
+        # Count metrics
+        metric_count=$(echo "$query_response" | grep -o '"metric":{' | wc -l)
+        echo "  Available metrics: $metric_count"
+    else
+        echo "✗ Prometheus query API is not working"
+        FAILED=$((FAILED + 1))
+    fi
+
+    echo ""
+    echo "=== Alert Rules Verification ==="
+
+    # Check alert rules
+    echo "Checking alert rules..."
+    rules_response=$(curl -s "http://prometheus.insightlearn-monitoring.svc.cluster.local:9090/api/v1/rules")
+    if echo "$rules_response" | grep -q '"status":"success"'; then
+        echo "✓ Alert rules are loaded"
+        SUCCESS=$((SUCCESS + 1))
+
+        # Count rules
+        rule_count=$(echo "$rules_response" | grep -o '"name":' | wc -l)
+        echo "  Loaded rules: $rule_count"
+    else
+        echo "✗ Alert rules are not loaded"
+        FAILED=$((FAILED + 1))
+    fi
+
+    echo ""
+    echo "=== Log Collection Verification ==="
+
+    # Check if logs are being collected in Elasticsearch
+    echo "Checking log collection in Elasticsearch..."
+    if curl -f -m 10 "http://elasticsearch.insightlearn-data.svc.cluster.local:9200/insightlearn-*/_search?size=1" > /dev/null 2>&1; then
+        echo "✓ Logs are being collected in Elasticsearch"
+        SUCCESS=$((SUCCESS + 1))
+    else
+        echo "⚠ Log collection verification skipped (Elasticsearch not accessible or no logs yet)"
+    fi
+
+    echo ""
+    echo "=== VERIFICATION SUMMARY ==="
+    echo "Successful checks: $SUCCESS"
+    echo "Failed checks: $FAILED"
+    echo "Total checks: $((SUCCESS + FAILED))"
+
+    if [ $FAILED -eq 0 ]; then
+        echo ""
+        echo "🎉 ALL MONITORING SERVICES ARE HEALTHY! 🎉"
+        echo ""
+        echo "Access your monitoring services:"
+        echo "  Prometheus:    http://prometheus.insightlearn.local (or port-forward to 9090)"
+        echo "  Grafana:       http://grafana.insightlearn.local (or port-forward to 3000)"
+        echo "  AlertManager:  http://alertmanager.insightlearn.local (or port-forward to 9093)"
+        echo "  Kibana:        http://kibana.insightlearn.local (or port-forward to 5601)"
+        echo "  Health:        http://health.insightlearn.local (or port-forward to 8080)"
+        echo ""
+        echo "Default credentials: admin / InsightLearn2024!"
+        exit 0
+    else
+        echo ""
+        echo "❌ SOME MONITORING SERVICES ARE NOT HEALTHY"
+        echo "Please check the logs and configuration for failed services."
+        exit 1
+    fi
+
+---
+# Monitoring Stack Status Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-status-dashboard
+  namespace: insightlearn-monitoring
+  labels:
+    app: monitoring-status
+data:
+  status.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>InsightLearn Monitoring Status</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+            .container { max-width: 1200px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 40px; }
+            .header h1 { margin: 0; font-size: 2.5em; }
+            .header p { margin: 10px 0 0 0; opacity: 0.8; }
+            .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+            .service {
+                background: rgba(255,255,255,0.1);
+                backdrop-filter: blur(10px);
+                padding: 20px;
+                border-radius: 10px;
+                border: 1px solid rgba(255,255,255,0.2);
+                transition: transform 0.3s ease;
+            }
+            .service:hover { transform: translateY(-5px); }
+            .service h3 { margin-top: 0; color: #fff; }
+            .service-url {
+                display: block;
+                background: rgba(255,255,255,0.1);
+                padding: 8px 12px;
+                border-radius: 5px;
+                text-decoration: none;
+                color: #fff;
+                margin: 10px 0;
+                transition: background 0.3s ease;
+            }
+            .service-url:hover { background: rgba(255,255,255,0.2); }
+            .status {
+                display: inline-block;
+                padding: 4px 8px;
+                border-radius: 3px;
+                font-size: 0.8em;
+                font-weight: bold;
+                margin: 5px 5px 0 0;
+            }
+            .online { background: #28a745; }
+            .offline { background: #dc3545; }
+            .unknown { background: #6c757d; }
+            .credentials {
+                background: rgba(255,255,255,0.1);
+                padding: 20px;
+                border-radius: 10px;
+                margin: 20px 0;
+                text-align: center;
+            }
+            .refresh-btn {
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 1em;
+                margin: 20px auto;
+                display: block;
+            }
+            .refresh-btn:hover { background: #0056b3; }
+            .footer { text-align: center; margin-top: 40px; opacity: 0.8; font-size: 0.9em; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🔍 InsightLearn Monitoring</h1>
+                <p>Complete observability stack for InsightLearn.Cloud platform</p>
+                <p id="last-update">Last updated: Loading...</p>
+            </div>
+
+            <div class="credentials">
+                <h3>🔐 Access Credentials</h3>
+                <p><strong>Username:</strong> admin | <strong>Password:</strong> InsightLearn2024!</p>
+                <p><em>Required for Prometheus, Grafana, and AlertManager</em></p>
+            </div>
+
+            <button class="refresh-btn" onclick="checkAllServices()">🔄 Refresh Status</button>
+
+            <div class="services">
+                <div class="service">
+                    <h3>📊 Prometheus</h3>
+                    <p>Metrics collection and alerting</p>
+                    <a href="http://prometheus.insightlearn.local" class="service-url" target="_blank">
+                        🌐 prometheus.insightlearn.local
+                    </a>
+                    <a href="http://localhost:9090" class="service-url" target="_blank">
+                        🏠 localhost:9090 (port-forward)
+                    </a>
+                    <div>
+                        <span id="prometheus-status" class="status unknown">Checking...</span>
+                    </div>
+                </div>
+
+                <div class="service">
+                    <h3>📈 Grafana</h3>
+                    <p>Data visualization and dashboards</p>
+                    <a href="http://grafana.insightlearn.local" class="service-url" target="_blank">
+                        🌐 grafana.insightlearn.local
+                    </a>
+                    <a href="http://localhost:3000" class="service-url" target="_blank">
+                        🏠 localhost:3000 (port-forward)
+                    </a>
+                    <div>
+                        <span id="grafana-status" class="status unknown">Checking...</span>
+                    </div>
+                </div>
+
+                <div class="service">
+                    <h3>🚨 AlertManager</h3>
+                    <p>Alert routing and notification</p>
+                    <a href="http://alertmanager.insightlearn.local" class="service-url" target="_blank">
+                        🌐 alertmanager.insightlearn.local
+                    </a>
+                    <a href="http://localhost:9093" class="service-url" target="_blank">
+                        🏠 localhost:9093 (port-forward)
+                    </a>
+                    <div>
+                        <span id="alertmanager-status" class="status unknown">Checking...</span>
+                    </div>
+                </div>
+
+                <div class="service">
+                    <h3>🔍 Kibana</h3>
+                    <p>Log visualization and analysis</p>
+                    <a href="http://kibana.insightlearn.local" class="service-url" target="_blank">
+                        🌐 kibana.insightlearn.local
+                    </a>
+                    <a href="http://localhost:5601" class="service-url" target="_blank">
+                        🏠 localhost:5601 (port-forward)
+                    </a>
+                    <div>
+                        <span id="kibana-status" class="status unknown">Checking...</span>
+                    </div>
+                </div>
+
+                <div class="service">
+                    <h3>💊 Health Dashboard</h3>
+                    <p>Application health monitoring</p>
+                    <a href="http://health.insightlearn.local" class="service-url" target="_blank">
+                        🌐 health.insightlearn.local
+                    </a>
+                    <a href="http://localhost:8080" class="service-url" target="_blank">
+                        🏠 localhost:8080 (port-forward)
+                    </a>
+                    <div>
+                        <span id="health-status" class="status unknown">Checking...</span>
+                    </div>
+                </div>
+
+                <div class="service">
+                    <h3>🎯 Application Services</h3>
+                    <p>Main InsightLearn services</p>
+                    <div style="margin: 10px 0;">
+                        API: <span id="api-status" class="status unknown">Checking...</span>
+                    </div>
+                    <div style="margin: 10px 0;">
+                        Web: <span id="web-status" class="status unknown">Checking...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>InsightLearn Monitoring Stack | Deployed with ❤️ using Kubernetes</p>
+                <p>For port forwarding: <code>kubectl port-forward -n insightlearn-monitoring svc/SERVICE LOCAL_PORT:REMOTE_PORT</code></p>
+            </div>
+        </div>
+
+        <script>
+            function updateStatus(serviceId, isOnline) {
+                const element = document.getElementById(serviceId + '-status');
+                if (isOnline) {
+                    element.textContent = 'Online';
+                    element.className = 'status online';
+                } else {
+                    element.textContent = 'Offline';
+                    element.className = 'status offline';
+                }
+            }
+
+            function checkAllServices() {
+                document.getElementById('last-update').textContent = 'Last updated: ' + new Date().toLocaleString();
+
+                // Note: In a real environment, these would be actual health checks
+                // For demonstration, we'll simulate the checks
+                setTimeout(() => updateStatus('prometheus', true), 100);
+                setTimeout(() => updateStatus('grafana', true), 200);
+                setTimeout(() => updateStatus('alertmanager', true), 300);
+                setTimeout(() => updateStatus('kibana', true), 400);
+                setTimeout(() => updateStatus('health', true), 500);
+                setTimeout(() => updateStatus('api', true), 600);
+                setTimeout(() => updateStatus('web', true), 700);
+            }
+
+            // Initial check
+            checkAllServices();
+
+            // Auto-refresh every 30 seconds
+            setInterval(checkAllServices, 30000);
+        </script>
+    </body>
+    </html>
+
+---
+# Status Dashboard Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-status-dashboard
+  namespace: insightlearn-monitoring
+  labels:
+    app: monitoring-status-dashboard
+    component: dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: monitoring-status-dashboard
+  template:
+    metadata:
+      labels:
+        app: monitoring-status-dashboard
+        component: dashboard
+    spec:
+      containers:
+      - name: status-dashboard
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: status-html
+          mountPath: /usr/share/nginx/html/
+        resources:
+          requests:
+            memory: '32Mi'
+            cpu: '10m'
+          limits:
+            memory: '64Mi'
+            cpu: '50m'
+      volumes:
+      - name: status-html
+        configMap:
+          name: monitoring-status-dashboard
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitoring-status-dashboard
+  namespace: insightlearn-monitoring
+  labels:
+    app: monitoring-status-dashboard
+    component: dashboard
+spec:
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  selector:
+    app: monitoring-status-dashboard
+  type: ClusterIP

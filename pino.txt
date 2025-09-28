@@ -1,0 +1,561 @@
+# Piano Master per InsightLearn.cloud - Claude Code Development
+
+## 🎯 Obiettivo del Progetto
+Sviluppare una piattaforma di e-learning di livello enterprise con design moderno e funzionalità avanzate, con integrazione AI completa e architettura cloud-native su Kubernetes.
+
+## 🏗️ Architettura del Sistema
+
+### Stack Tecnologico
+- **Frontend**: Blazor Hybrid (SSR + WebAssembly Interactive)
+- **Backend**: .NET 8.0 Web API
+- **Database**: 
+  - SQL Server (utenti, log, interazioni, amministrazione, SEO)
+  - MongoDB GridFS (video e contenuti multimediali)
+- **Cache & Search**: Redis + Elasticsearch
+- **Reverse Proxy**: Nginx
+- **AI**: Ollama (llama2, codellama, mistral)
+- **Autenticazione**: JWT + HTTP Cookies + Google OAuth
+- **Container**: Docker + Kubernetes su Debian 13
+
+### Componenti del Sistema
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Nginx Ingress │────│  Blazor Frontend │────│  .NET Web API  │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                │                        │
+                                │                        ├── SQL Server
+                                │                        ├── MongoDB
+                                │                        ├── Redis
+                                │                        ├── Elasticsearch
+                                │                        └── Ollama AI
+                                │
+                    ┌──────────────────┐
+                    │   PWA Offline    │
+                    │   Capabilities   │
+                    └──────────────────┘
+```
+
+## 📁 Struttura del Progetto
+
+```
+InsightLearn.Cloud/
+├── src/
+│   ├── InsightLearn.Web/                 # Blazor Hybrid App
+│   │   ├── Components/
+│   │   │   ├── Layout/
+│   │   │   ├── Pages/
+│   │   │   ├── Shared/
+│   │   │   └── AI/
+│   │   ├── wwwroot/
+│   │   │   ├── css/
+│   │   │   ├── js/
+│   │   │   ├── assets/
+│   │   │   └── sw.js
+│   │   ├── Services/
+│   │   └── Program.cs
+│   ├── InsightLearn.Api/                 # Web API Backend
+│   │   ├── Controllers/
+│   │   ├── Services/
+│   │   ├── Middleware/
+│   │   ├── Models/
+│   │   └── Program.cs
+│   ├── InsightLearn.Core/                # Business Logic
+│   │   ├── Entities/
+│   │   ├── Interfaces/
+│   │   ├── Services/
+│   │   └── DTOs/
+│   ├── InsightLearn.Infrastructure/      # Data Access
+│   │   ├── Data/
+│   │   ├── Repositories/
+│   │   ├── MongoDB/
+│   │   ├── Redis/
+│   │   └── Elasticsearch/
+│   └── InsightLearn.AI/                  # Ollama Integration
+│       ├── Services/
+│       ├── Models/
+│       └── Processors/
+├── kubernetes/
+│   ├── namespace.yaml
+│   ├── configmaps/
+│   ├── secrets/
+│   ├── deployments/
+│   ├── services/
+│   └── ingress.yaml
+├── docker/
+│   ├── Dockerfile.web
+│   ├── Dockerfile.api
+│   ├── docker-compose.yml
+│   └── nginx.conf
+├── scripts/
+│   ├── setup-cluster.sh
+│   ├── deploy.sh
+│   └── backup.sh
+└── docs/
+    ├── api-documentation.md
+    ├── deployment-guide.md
+    └── architecture.md
+```
+
+## 🚀 Fasi di Sviluppo per Claude Code
+
+### FASE 1: Setup Infrastruttura Base (Settimana 1-2)
+
+#### 1.1 Inizializzazione Progetto
+```bash
+# Claude Code: Crea la struttura base del progetto
+mkdir InsightLearn.Cloud && cd InsightLearn.Cloud
+dotnet new sln -n InsightLearn.Cloud
+mkdir -p src/{InsightLearn.Web,InsightLearn.Api,InsightLearn.Core,InsightLearn.Infrastructure,InsightLearn.AI}
+mkdir -p kubernetes/{configmaps,secrets,deployments,services}
+mkdir -p docker scripts docs
+```
+
+#### 1.2 Setup Blazor Hybrid Application
+```bash
+# Claude Code: Crea il progetto Blazor con template personalizzato
+cd src/InsightLearn.Web
+dotnet new blazor --interactivity Auto --all-interactive false --auth None
+dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
+dotnet add package Microsoft.AspNetCore.Authentication.Google
+dotnet add package Microsoft.Extensions.Caching.Redis
+dotnet add package MudBlazor
+```
+
+#### 1.3 Setup Web API Backend
+```bash
+# Claude Code: Crea il progetto API
+cd ../InsightLearn.Api
+dotnet new webapi --use-controllers
+dotnet add package Microsoft.EntityFrameworkCore.SqlServer
+dotnet add package MongoDB.Driver
+dotnet add package StackExchange.Redis
+dotnet add package Elasticsearch.Net
+dotnet add package Swashbuckle.AspNetCore
+```
+
+#### 1.4 Setup Core e Infrastructure
+```bash
+# Claude Code: Progetti di supporto
+cd ../InsightLearn.Core
+dotnet new classlib
+cd ../InsightLearn.Infrastructure
+dotnet new classlib
+cd ../InsightLearn.AI
+dotnet new classlib
+dotnet add package RestSharp
+```
+
+### FASE 2: Design System e UI Components (Settimana 3-4)
+
+#### 2.1 Design System Avanzato
+**Claude Code Task**: Implementa un design system moderno e avanzato
+
+**Specifiche Design:**
+- Dark/Light theme con animazioni fluide
+- Glass morphism e neumorphism elements
+- Micro-interactions avanzate
+- Design mobile-first responsive
+- Performance-optimized animations
+
+**File da creare:**
+```css
+/* wwwroot/css/design-system.css */
+:root {
+    /* Design tokens moderni e professionali */
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --shadow-neumorphism: 20px 20px 60px #bebebe, -20px -20px 60px #ffffff;
+    --animation-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.neumorphic-btn {
+    background: #f0f0f0;
+    border-radius: 50px;
+    box-shadow: var(--shadow-neumorphism);
+    transition: all 0.3s var(--animation-spring);
+}
+
+.course-card-hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}
+```
+
+#### 2.2 Componenti UI Avanzati
+**Claude Code Task**: Crea componenti riutilizabili moderni
+
+**Componenti da implementare:**
+1. `CourseCard.razor` - Card con animazioni avanzate
+2. `AIChat.razor` - Chat intelligente integrata
+3. `VideoPlayer.razor` - Player personalizzato con AI
+4. `NavigationBar.razor` - Navigation fluida
+5. `SearchBar.razor` - Search con AI suggestions
+
+### FASE 3: Autenticazione Multi-Layer (Settimana 5)
+
+#### 3.1 JWT + HTTP Cookies Implementation
+**Claude Code Task**: Implementa autenticazione sicura enterprise
+
+**File: `Services/AuthenticationService.cs`**
+```csharp
+public class AuthenticationService
+{
+    // Implementazione JWT + Cookies + Google OAuth
+    // - Token refresh automatico
+    // - Secure HTTP-only cookies
+    // - Multi-factor authentication ready
+    // - Session management avanzata
+}
+```
+
+#### 3.2 Google OAuth Integration
+**Claude Code Task**: Integrazione Google completa
+- Client-side e server-side validation
+- User profile synchronization
+- Permissions management
+
+### FASE 4: Backend Services e API (Settimana 6-7)
+
+#### 4.1 SQL Server Setup
+**Claude Code Task**: Database schema enterprise
+
+**Tabelle principali:**
+- Users (profili, preferenze, progress)
+- UserInteractions (tracking completo)
+- Courses (metadata, SEO)
+- Analytics (business intelligence)
+- Logs (sistema completo)
+
+#### 4.2 MongoDB GridFS per Video
+**Claude Code Task**: Sistema video avanzato
+- Chunked upload per file grandi
+- Video processing pipeline
+- Thumbnail generation
+- Multiple quality streams
+
+#### 4.3 Redis Caching Strategy
+**Claude Code Task**: Caching intelligente
+- User sessions
+- Video metadata
+- Search results
+- AI responses cache
+
+#### 4.4 Elasticsearch Integration
+**Claude Code Task**: Search e Analytics
+- Full-text search avanzata
+- Real-time analytics
+- User behavior tracking
+- Business intelligence queries
+
+### FASE 5: Integrazione AI con Ollama (Settimana 8-9)
+
+#### 5.1 Ollama Service Integration
+**Claude Code Task**: Integrazione AI completa
+
+**Servizi AI da implementare:**
+1. **Course Recommendations**
+   ```csharp
+   public class CourseRecommendationService
+   {
+       // AI-powered recommendations basate su:
+       // - User learning history
+       // - Skill gaps analysis  
+       // - Industry trends
+       // - Peer learning patterns
+   }
+   ```
+
+2. **Intelligent Chatbot**
+   ```csharp
+   public class AIChatbotService
+   {
+       // Supporto contestuale per:
+       // - Course content questions
+       // - Technical support
+       // - Learning path guidance
+       // - Career advice
+   }
+   ```
+
+3. **Content Generation**
+   ```csharp
+   public class ContentGenerationService
+   {
+       // Generazione automatica di:
+       // - Quiz questions
+       // - Course summaries
+       // - Learning objectives
+       // - Code examples
+   }
+   ```
+
+4. **Personalized Tutoring**
+   ```csharp
+   public class PersonalizedTutoringService
+   {
+       // Tutoring adattivo per:
+       // - Difficulty adjustment
+       // - Learning style adaptation
+       // - Progress acceleration
+       // - Weak point identification
+   }
+   ```
+
+### FASE 6: Advanced Features (Settimana 10-11)
+
+#### 6.1 Video Processing Pipeline
+**Claude Code Task**: Sistema video enterprise
+- Multiple format support (MP4, WebM, HLS)
+- Adaptive bitrate streaming
+- Subtitle generation automatica
+- Video analytics integration
+
+#### 6.2 Real-time Features
+**Claude Code Task**: Funzionalità real-time
+- Live streaming support
+- Real-time chat durante video
+- Collaborative notes
+- Live Q&A con AI
+
+#### 6.3 PWA e Offline Capability
+**Claude Code Task**: Progressive Web App
+- Service Worker avanzato
+- Offline video viewing
+- Sync quando torna online
+- Push notifications intelligenti
+
+### FASE 7: Kubernetes Deployment (Settimana 12)
+
+#### 7.1 Docker Containerization
+**Claude Code Task**: Container ottimizzati
+
+**Dockerfile.web (Multi-stage ottimizzato):**
+```dockerfile
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
+WORKDIR /app
+EXPOSE 80 443
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
+WORKDIR /src
+COPY ["src/InsightLearn.Web/InsightLearn.Web.csproj", "InsightLearn.Web/"]
+RUN dotnet restore "InsightLearn.Web/InsightLearn.Web.csproj"
+COPY . .
+RUN dotnet build "InsightLearn.Web/InsightLearn.Web.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "InsightLearn.Web/InsightLearn.Web.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "InsightLearn.Web.dll"]
+```
+
+#### 7.2 Kubernetes Manifests
+**Claude Code Task**: Deploy production-ready
+
+**Componenti K8s:**
+1. **Namespace e ConfigMaps**
+2. **Secrets Management**
+3. **Deployments con Health Checks**
+4. **Services e LoadBalancers**
+5. **Ingress con SSL/TLS**
+6. **HorizontalPodAutoscaler**
+7. **PersistentVolumes per dati**
+
+#### 7.3 Nginx Configuration
+**Claude Code Task**: Reverse proxy ottimizzato
+
+```nginx
+# nginx.conf ottimizzato per video streaming
+upstream blazor_backend {
+    server blazor-web:80;
+}
+
+upstream api_backend {
+    server api-service:80;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name insightlearn.cloud;
+    
+    # SSL configuration
+    ssl_certificate /etc/ssl/certs/server.crt;
+    ssl_certificate_key /etc/ssl/private/server.key;
+    
+    # Ottimizzazioni per video streaming
+    client_max_body_size 2G;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 300;
+    
+    # Caching intelligente
+    location ~* \.(mp4|webm|jpg|jpeg|png|gif|ico|css|js)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    location /api/ {
+        proxy_pass http://api_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    location / {
+        proxy_pass http://blazor_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket support per Blazor Server
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+### FASE 8: Testing e Optimization (Settimana 13)
+
+#### 8.1 Performance Testing
+**Claude Code Task**: Test completi
+- Load testing con K6
+- Performance profiling
+- Memory leak detection
+- Database query optimization
+
+#### 8.2 Security Hardening
+**Claude Code Task**: Sicurezza enterprise
+- Penetration testing
+- OWASP compliance
+- JWT security audit
+- Data encryption verification
+
+### FASE 9: Monitoring e Analytics (Settimana 14)
+
+#### 9.1 Application Monitoring
+**Claude Code Task**: Monitoring completo
+- Prometheus + Grafana
+- Application Insights
+- Custom dashboards
+- Alert management
+
+#### 9.2 Business Analytics
+**Claude Code Task**: Analytics avanzate
+- User behavior tracking
+- Course completion rates
+- Revenue analytics
+- AI performance metrics
+
+### FASE 10: CI/CD e Production Deploy (Settimana 15-16)
+
+#### 10.1 GitHub Actions Pipeline
+**Claude Code Task**: CI/CD completo
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Kubernetes
+on:
+  push:
+    branches: [main]
+    
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0.x
+    - name: Build and Test
+      run: |
+        dotnet restore
+        dotnet build --configuration Release
+        dotnet test --no-build --verbosity normal
+    - name: Build Docker Images
+      run: |
+        docker build -t insightlearn-web:${{ github.sha }} -f docker/Dockerfile.web .
+        docker build -t insightlearn-api:${{ github.sha }} -f docker/Dockerfile.api .
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl apply -f kubernetes/
+        kubectl set image deployment/web-deployment web=insightlearn-web:${{ github.sha }}
+        kubectl set image deployment/api-deployment api=insightlearn-api:${{ github.sha }}
+```
+
+#### 10.2 Production Deployment
+**Claude Code Task**: Deploy finale su Kubernetes
+
+**Script di deployment automatico:**
+```bash
+#!/bin/bash
+# scripts/deploy.sh
+echo "🚀 Deploying InsightLearn.Cloud to Production..."
+
+# Update configurations
+kubectl apply -f kubernetes/namespace.yaml
+kubectl apply -f kubernetes/configmaps/
+kubectl apply -f kubernetes/secrets/
+
+# Deploy services
+kubectl apply -f kubernetes/deployments/
+kubectl apply -f kubernetes/services/
+kubectl apply -f kubernetes/ingress.yaml
+
+# Wait for rollout
+kubectl rollout status deployment/web-deployment -n insightlearn
+kubectl rollout status deployment/api-deployment -n insightlearn
+
+echo "✅ Deployment completed successfully!"
+```
+
+## 📋 Checklist Finale per Claude Code
+
+### ✅ Funzionalità Core Implementate
+- [ ] Autenticazione multi-layer (JWT + Cookies + Google)
+- [ ] Sistema video completo (GridFS + streaming)
+- [ ] AI integration completa (4 servizi Ollama)
+- [ ] Design system superiore a Udemy
+- [ ] Search e analytics avanzate
+- [ ] PWA con offline capability
+- [ ] Performance ottimizzate
+
+### ✅ Infrastruttura Enterprise
+- [ ] Kubernetes deployment completo
+- [ ] Docker containers ottimizzati
+- [ ] Nginx reverse proxy configurato
+- [ ] Database replication (SQL Server + MongoDB)
+- [ ] Redis caching strategy
+- [ ] Elasticsearch search engine
+
+### ✅ DevOps e Production
+- [ ] CI/CD pipeline automatizzato
+- [ ] Monitoring e alerting
+- [ ] Security hardening completo
+- [ ] Performance testing passed
+- [ ] Documentation completa
+
+## 🎯 Risultato Finale
+
+Al completamento di questo piano, avrai:
+- **Una piattaforma e-learning moderna e professionale** con design avanzato e funzionalità complete
+- **AI integration completa** con raccomandazioni, chatbot, generazione contenuti e tutoring
+- **Architettura cloud-native scalabile** su Kubernetes
+- **Performance enterprise-grade** con caching intelligente
+- **Sicurezza multi-layer** con autenticazione avanzata
+- **Monitoring e analytics** per business intelligence
+
+Ogni fase è strutturata per essere eseguita sequenzialmente da Claude Code, con output verificabili e milestone chiari.

@@ -1,0 +1,383 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: insightlearn-monitoring
+  labels:
+    app: fluentd
+data:
+  fluent.conf: |
+    <source>
+      @type tail
+      path /var/log/containers/*.log
+      pos_file /var/log/fluentd-containers.log.pos
+      tag kubernetes.*
+      read_from_head true
+      <parse>
+        @type json
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+    </source>
+
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+      @id filter_kube_metadata
+      kubernetes_url "#{ENV['FLUENT_FILTER_KUBERNETES_URL'] || 'https://' + ENV.fetch('KUBERNETES_SERVICE_HOST') + ':' + ENV.fetch('KUBERNETES_SERVICE_PORT') + '/api'}"
+      verify_ssl "#{ENV['KUBERNETES_VERIFY_SSL'] || true}"
+      ca_file "#{ENV['KUBERNETES_CA_FILE'] || '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'}"
+      skip_labels false
+      skip_container_metadata false
+      skip_master_url false
+      skip_namespace_metadata false
+    </filter>
+
+    <filter kubernetes.**>
+      @type grep
+      <regexp>
+        key $.kubernetes.namespace_name
+        pattern ^(insightlearn|insightlearn-data|insightlearn-ai|insightlearn-monitoring)$
+      </regexp>
+    </filter>
+
+    <filter kubernetes.var.log.containers.insightlearn-api**>
+      @type parser
+      key_name log
+      reserve_data true
+      inject_key_prefix parsed_
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+          time_key timestamp
+          time_format %Y-%m-%dT%H:%M:%S.%L
+        </pattern>
+        <pattern>
+          format regexp
+          expression /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\s+\[(?<level>\w+)\]\s+(?<logger>[^\s]+)\s+-\s+(?<message>.*)/
+          time_format %Y-%m-%dT%H:%M:%S.%LZ
+        </pattern>
+        <pattern>
+          format none
+        </pattern>
+      </parse>
+    </filter>
+
+    <match kubernetes.**>
+      @type elasticsearch
+      host elasticsearch.insightlearn-data.svc.cluster.local
+      port 9200
+      logstash_format true
+      logstash_prefix insightlearn
+      logstash_dateformat %Y.%m.%d
+      include_tag_key true
+      type_name _doc
+      tag_key @log_name
+      flush_interval 1s
+      <buffer>
+        @type file
+        path /var/log/fluentd-buffers/kubernetes.system.buffer
+        flush_mode interval
+        retry_type exponential_backoff
+        flush_thread_count 2
+        flush_interval 5s
+        retry_forever
+        retry_max_interval 30
+        chunk_limit_size 2M
+        queue_limit_length 8
+        overflow_action block
+      </buffer>
+    </match>
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+  namespace: insightlearn-monitoring
+  labels:
+    app: fluentd
+    component: logging
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+        component: logging
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9309"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: monitoring-sa
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      containers:
+      - name: fluentd
+        image: fluent/fluentd-kubernetes-daemonset:v1.16-debian-elasticsearch7-1
+        env:
+        - name: FLUENT_ELASTICSEARCH_HOST
+          value: "elasticsearch.insightlearn-data.svc.cluster.local"
+        - name: FLUENT_ELASTICSEARCH_PORT
+          value: "9200"
+        - name: FLUENT_ELASTICSEARCH_SCHEME
+          value: "http"
+        - name: FLUENT_UID
+          value: "0"
+        - name: FLUENTD_SYSTEMD_CONF
+          value: disable
+        - name: FLUENT_CONTAINER_TAIL_EXCLUDE_PATH
+          value: /var/log/containers/fluent*
+        resources:
+          limits:
+            memory: 200Mi
+            cpu: 100m
+          requests:
+            memory: 100Mi
+            cpu: 50m
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: fluentd-config
+          mountPath: /fluentd/etc/fluent.conf
+          subPath: fluent.conf
+        - name: fluentd-buffer
+          mountPath: /var/log/fluentd-buffers
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: fluentd-config
+        configMap:
+          name: fluentd-config
+      - name: fluentd-buffer
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-config
+  namespace: insightlearn-monitoring
+  labels:
+    app: kibana
+data:
+  kibana.yml: |
+    server.name: kibana
+    server.host: "0.0.0.0"
+    server.port: 5601
+    elasticsearch.hosts: ["http://elasticsearch.insightlearn-data.svc.cluster.local:9200"]
+    logging.dest: stdout
+    logging.silent: false
+    logging.quiet: false
+    logging.verbose: false
+    elasticsearch.pingTimeout: 1500
+    elasticsearch.requestTimeout: 30000
+    elasticsearch.shardTimeout: 0
+    elasticsearch.ssl.verificationMode: none
+    server.defaultRoute: '/app/discover'
+
+    # Index patterns
+    kibana.index: ".kibana"
+
+    # Security
+    xpack.security.enabled: false
+    xpack.monitoring.enabled: true
+
+    # UI Configuration
+    server.maxPayloadBytes: 1048576
+    server.compression.enabled: true
+
+    # Dashboard auto-import
+    kibana.defaultAppId: "discover"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: insightlearn-monitoring
+  labels:
+    app: kibana
+    component: logging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+        component: logging
+    spec:
+      serviceAccountName: monitoring-sa
+      containers:
+      - name: kibana
+        image: kibana:7.17.13
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch.insightlearn-data.svc.cluster.local:9200"
+        - name: SERVER_NAME
+          value: "kibana.insightlearn-monitoring.svc.cluster.local"
+        ports:
+        - containerPort: 5601
+          name: kibana
+        volumeMounts:
+        - name: kibana-config
+          mountPath: /usr/share/kibana/config/kibana.yml
+          subPath: kibana.yml
+        resources:
+          limits:
+            memory: 1Gi
+            cpu: 500m
+          requests:
+            memory: 512Mi
+            cpu: 200m
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 120
+          timeoutSeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 60
+          timeoutSeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: kibana-config
+        configMap:
+          name: kibana-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: insightlearn-monitoring
+  labels:
+    app: kibana
+    component: logging
+spec:
+  ports:
+  - name: kibana
+    port: 5601
+    targetPort: 5601
+    protocol: TCP
+  selector:
+    app: kibana
+  type: ClusterIP
+
+---
+# Log retention job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: elasticsearch-curator
+  namespace: insightlearn-monitoring
+  labels:
+    app: elasticsearch-curator
+    component: logging
+spec:
+  schedule: "0 1 * * *"  # Daily at 1 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: monitoring-sa
+          containers:
+          - name: curator
+            image: untergeek/curator:8.0.6
+            args:
+            - curator
+            - --config
+            - /etc/curator/config.yml
+            - /etc/curator/actions.yml
+            volumeMounts:
+            - name: curator-config
+              mountPath: /etc/curator
+          volumes:
+          - name: curator-config
+            configMap:
+              name: curator-config
+          restartPolicy: OnFailure
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: curator-config
+  namespace: insightlearn-monitoring
+  labels:
+    app: elasticsearch-curator
+data:
+  config.yml: |
+    client:
+      hosts:
+        - elasticsearch.insightlearn-data.svc.cluster.local
+      port: 9200
+      url_prefix:
+      use_ssl: False
+      certificate:
+      client_cert:
+      client_key:
+      ssl_no_validate: False
+      http_auth:
+      timeout: 30
+      master_only: False
+
+    logging:
+      loglevel: INFO
+      logfile:
+      logformat: default
+      blacklist: ['elasticsearch', 'urllib3']
+
+  actions.yml: |
+    actions:
+      1:
+        action: delete_indices
+        description: "Delete insightlearn indices older than 30 days"
+        options:
+          ignore_empty_list: True
+          disable_action: False
+        filters:
+        - filtertype: pattern
+          kind: prefix
+          value: insightlearn-
+        - filtertype: age
+          source: name
+          direction: older
+          timestring: '%Y.%m.%d'
+          unit: days
+          unit_count: 30
+      2:
+        action: delete_indices
+        description: "Delete .kibana indices older than 90 days"
+        options:
+          ignore_empty_list: True
+          disable_action: False
+        filters:
+        - filtertype: pattern
+          kind: prefix
+          value: .kibana
+        - filtertype: age
+          source: creation_date
+          direction: older
+          unit: days
+          unit_count: 90

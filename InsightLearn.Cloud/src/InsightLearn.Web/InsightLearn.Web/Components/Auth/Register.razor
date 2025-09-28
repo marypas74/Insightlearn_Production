@@ -1,0 +1,540 @@
+@page "/register"
+@using System.ComponentModel.DataAnnotations
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<PageTitle>Sign Up - InsightLearn.Cloud</PageTitle>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Create Account</h1>
+            <p>Join InsightLearn.Cloud and start your learning journey</p>
+        </div>
+
+        <EditForm Model="@registerModel" OnValidSubmit="@HandleSubmit" class="auth-form">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    @errorMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    @successMessage
+                </div>
+            }
+
+            <div class="form-row">
+                <div class="form-group form-group-half">
+                    <label for="firstName">First Name</label>
+                    <InputText id="firstName" @bind-Value="registerModel.FirstName" class="form-input" placeholder="First name" />
+                    <ValidationMessage For="@(() => registerModel.FirstName)" class="validation-error" />
+                </div>
+                <div class="form-group form-group-half">
+                    <label for="lastName">Last Name</label>
+                    <InputText id="lastName" @bind-Value="registerModel.LastName" class="form-input" placeholder="Last name" />
+                    <ValidationMessage For="@(() => registerModel.LastName)" class="validation-error" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <InputText id="email" @bind-Value="registerModel.Email" class="form-input" placeholder="Enter your email" />
+                <ValidationMessage For="@(() => registerModel.Email)" class="validation-error" />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <InputText id="password" type="password" @bind-Value="registerModel.Password" class="form-input" placeholder="Create a strong password" />
+                <ValidationMessage For="@(() => registerModel.Password)" class="validation-error" />
+                <div class="password-requirements">
+                    <small>Password must be at least 8 characters with uppercase, lowercase, number, and special character</small>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password</label>
+                <InputText id="confirmPassword" type="password" @bind-Value="registerModel.ConfirmPassword" class="form-input" placeholder="Confirm your password" />
+                <ValidationMessage For="@(() => registerModel.ConfirmPassword)" class="validation-error" />
+            </div>
+
+            <div class="form-group">
+                <label for="userType">I am a:</label>
+                <InputSelect id="userType" @bind-Value="registerModel.UserType" class="form-input">
+                    <option value="1">Student - Looking to learn new skills</option>
+                    <option value="2">Instructor - Want to teach and create courses</option>
+                </InputSelect>
+                <ValidationMessage For="@(() => registerModel.UserType)" class="validation-error" />
+            </div>
+
+            <div class="form-group-checkbox">
+                <InputCheckbox id="terms" @bind-Value="registerModel.AcceptTerms" class="form-checkbox" />
+                <label for="terms">I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a></label>
+                <ValidationMessage For="@(() => registerModel.AcceptTerms)" class="validation-error" />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Creating account...</span>
+                }
+                else
+                {
+                    <span>Create Account</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="auth-divider">
+            <span>or sign up with</span>
+        </div>
+
+        <div class="oauth-buttons">
+            <button type="button" class="btn btn-oauth btn-google" @onclick="() => RegisterWithOAuth(&quot;google&quot;)" disabled="@isLoading">
+                <i class="fab fa-google"></i>
+                <span>Google</span>
+            </button>
+            <button type="button" class="btn btn-oauth btn-github" @onclick="() => RegisterWithOAuth(&quot;github&quot;)" disabled="@isLoading">
+                <i class="fab fa-github"></i>
+                <span>GitHub</span>
+            </button>
+        </div>
+
+        <div class="auth-links">
+            <p>Already have an account? <a href="/login">Sign in here</a></p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterModel registerModel = new();
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isLoading = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Check if user is already authenticated
+            var token = await JS.InvokeAsync<string>("localStorage.getItem", "accessToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Navigation.NavigateTo("/dashboard");
+            }
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var request = new
+            {
+                firstName = registerModel.FirstName,
+                lastName = registerModel.LastName,
+                email = registerModel.Email,
+                password = registerModel.Password,
+                confirmPassword = registerModel.ConfirmPassword,
+                userType = registerModel.UserType
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/auth/register", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+
+                if (authResponse != null)
+                {
+                    // Store tokens
+                    await JS.InvokeVoidAsync("localStorage.setItem", "accessToken", authResponse.AccessToken);
+                    await JS.InvokeVoidAsync("localStorage.setItem", "refreshToken", authResponse.RefreshToken);
+                    await JS.InvokeVoidAsync("localStorage.setItem", "user", System.Text.Json.JsonSerializer.Serialize(authResponse.User));
+
+                    // Set authorization header
+                    Http.DefaultRequestHeaders.Authorization =
+                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse.AccessToken);
+
+                    successMessage = "Account created successfully! Please check your email to verify your account.";
+
+                    // Redirect after a short delay to show success message
+                    await Task.Delay(2000);
+                    Navigation.NavigateTo("/dashboard");
+                }
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                errorMessage = errorResponse?.Error ?? "Registration failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during registration. Please try again.";
+            Console.WriteLine($"Registration error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RegisterWithOAuth(string provider)
+    {
+        try
+        {
+            // Redirect to OAuth provider
+            var redirectUri = $"{Navigation.BaseUri}auth/callback/{provider}";
+            var authUrl = provider.ToLower() switch
+            {
+                "google" => $"https://accounts.google.com/oauth/authorize?client_id=YOUR_GOOGLE_CLIENT_ID&redirect_uri={Uri.EscapeDataString(redirectUri)}&response_type=code&scope=openid%20profile%20email",
+                "github" => $"https://github.com/login/oauth/authorize?client_id=YOUR_GITHUB_CLIENT_ID&redirect_uri={Uri.EscapeDataString(redirectUri)}&scope=user:email",
+                _ => throw new NotSupportedException($"OAuth provider '{provider}' is not supported")
+            };
+
+            Navigation.NavigateTo(authUrl, true);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"OAuth registration failed: {ex.Message}";
+        }
+    }
+
+    public class RegisterModel
+    {
+        [Required(ErrorMessage = "First name is required")]
+        [StringLength(100, ErrorMessage = "First name must not exceed 100 characters")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Last name is required")]
+        [StringLength(100, ErrorMessage = "Last name must not exceed 100 characters")]
+        public string LastName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Please enter a valid email address")]
+        [StringLength(255, ErrorMessage = "Email must not exceed 255 characters")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required")]
+        [StringLength(128, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 128 characters")]
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]",
+            ErrorMessage = "Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Please confirm your password")]
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Please select your role")]
+        [Range(1, 2, ErrorMessage = "Please select a valid user type")]
+        public int UserType { get; set; } = 1;
+
+        [Required(ErrorMessage = "You must accept the terms and conditions")]
+        [Range(typeof(bool), "true", "true", ErrorMessage = "You must accept the terms and conditions")]
+        public bool AcceptTerms { get; set; } = false;
+    }
+
+    public class AuthResponse
+    {
+        public string AccessToken { get; set; } = string.Empty;
+        public string RefreshToken { get; set; } = string.Empty;
+        public DateTime ExpiresAt { get; set; }
+        public UserDto User { get; set; } = new();
+    }
+
+    public class UserDto
+    {
+        public int Id { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public bool EmailVerified { get; set; }
+        public List<string> Roles { get; set; } = new();
+        public List<string> Permissions { get; set; } = new();
+    }
+
+    public class ErrorResponse
+    {
+        public string Error { get; set; } = string.Empty;
+    }
+}
+
+<style>
+    .auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: calc(100vh - 100px);
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .auth-card {
+        background: white;
+        border-radius: 16px;
+        padding: 40px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 32px;
+    }
+
+    .auth-header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 8px;
+    }
+
+    .auth-header p {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+
+    .auth-form {
+        margin-bottom: 24px;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group-half {
+        flex: 1;
+        margin-bottom: 0;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 6px;
+        font-size: 0.875rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .password-requirements {
+        margin-top: 4px;
+    }
+
+    .password-requirements small {
+        color: #6b7280;
+        font-size: 0.75rem;
+    }
+
+    .form-group-checkbox {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        gap: 8px;
+    }
+
+    .form-checkbox {
+        margin-top: 2px;
+        flex-shrink: 0;
+    }
+
+    .form-group-checkbox label {
+        margin-bottom: 0;
+        font-size: 0.875rem;
+        color: #374151;
+        cursor: pointer;
+        line-height: 1.4;
+    }
+
+    .form-group-checkbox label a {
+        color: #667eea;
+        text-decoration: none;
+    }
+
+    .form-group-checkbox label a:hover {
+        text-decoration: underline;
+    }
+
+    .btn {
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.875rem;
+        transition: all 0.15s ease-in-out;
+        cursor: pointer;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        box-shadow: 0 4px 14px 0 rgba(102, 126, 234, 0.39);
+        transform: translateY(-1px);
+    }
+
+    .btn-full {
+        width: 100%;
+    }
+
+    .auth-divider {
+        text-align: center;
+        margin: 24px 0;
+        position: relative;
+    }
+
+    .auth-divider::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: #e5e7eb;
+    }
+
+    .auth-divider span {
+        background: white;
+        padding: 0 16px;
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+
+    .oauth-buttons {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .btn-oauth {
+        flex: 1;
+        background: #f9fafb;
+        color: #374151;
+        border: 2px solid #e5e7eb;
+    }
+
+    .btn-oauth:hover:not(:disabled) {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+    }
+
+    .btn-google:hover:not(:disabled) {
+        border-color: #ea4335;
+        color: #ea4335;
+    }
+
+    .btn-github:hover:not(:disabled) {
+        border-color: #333;
+        color: #333;
+    }
+
+    .auth-links {
+        text-align: center;
+    }
+
+    .auth-links a {
+        color: #667eea;
+        text-decoration: none;
+        font-size: 0.875rem;
+    }
+
+    .auth-links a:hover {
+        text-decoration: underline;
+    }
+
+    .auth-links p {
+        margin-top: 16px;
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+
+    .alert {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.875rem;
+    }
+
+    .alert-error {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+    }
+
+    .alert-success {
+        background: #f0fdf4;
+        color: #16a34a;
+        border: 1px solid #bbf7d0;
+    }
+
+    .validation-error {
+        color: #dc2626;
+        font-size: 0.75rem;
+        margin-top: 4px;
+        display: block;
+    }
+
+    @media (max-width: 640px) {
+        .form-row {
+            flex-direction: column;
+        }
+
+        .oauth-buttons {
+            flex-direction: column;
+        }
+
+        .auth-card {
+            padding: 24px;
+        }
+    }
+</style>

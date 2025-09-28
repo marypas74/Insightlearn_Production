@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: insightlearn-production-ingress
+  namespace: insightlearn
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - "192.168.1.103"
+    secretName: insightlearn-tls-secret
+  rules:
+  - host: "192.168.1.103"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: insightlearn-web-service
+            port:
+              number: 80

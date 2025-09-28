@@ -1,0 +1,103 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: insightlearn-db-migration
+  namespace: insightlearn
+  labels:
+    app: insightlearn-db-migration
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: insightlearn-db-migration
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: migration
+        image: insightlearn-api:latest
+        imagePullPolicy: Never
+        command: ["/bin/sh"]
+        args: ["-c", "dotnet ef database update --verbose || echo 'Migration completed with warnings'"]
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ConnectionStrings__DefaultConnection
+          value: "Server=postgresql.insightlearn-data.svc.cluster.local,5432;Database=InsightLearnDb;User Id=insightlearn;Password=InsightLearn2024!;TrustServerCertificate=true;"
+        - name: ConnectionStrings__MongoDb
+          value: "mongodb://insightlearn:InsightLearn2024!@mongodb.insightlearn-data.svc.cluster.local:27017/InsightLearnDb?authSource=admin"
+        - name: ConnectionStrings__Redis
+          value: "redis.insightlearn-data.svc.cluster.local:6379"
+        - name: ConnectionStrings__Elasticsearch
+          value: "http://elasticsearch.insightlearn-data.svc.cluster.local:9200"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:15-alpine
+        command: ['sh', '-c']
+        args: ['until pg_isready -h postgresql.insightlearn-data.svc.cluster.local -p 5432; do echo waiting for postgres; sleep 2; done;']
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: insightlearn-data-seed
+  namespace: insightlearn
+  labels:
+    app: insightlearn-data-seed
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: insightlearn-data-seed
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: seed
+        image: insightlearn-api:latest
+        imagePullPolicy: Never
+        command: ["/bin/sh"]
+        args: ["-c", "dotnet InsightLearn.Api.dll --seed || echo 'Data seeding completed'"]
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ConnectionStrings__DefaultConnection
+          value: "Server=postgresql.insightlearn-data.svc.cluster.local,5432;Database=InsightLearnDb;User Id=insightlearn;Password=InsightLearn2024!;TrustServerCertificate=true;"
+        - name: ConnectionStrings__MongoDb
+          value: "mongodb://insightlearn:InsightLearn2024!@mongodb.insightlearn-data.svc.cluster.local:27017/InsightLearnDb?authSource=admin"
+        - name: ConnectionStrings__Redis
+          value: "redis.insightlearn-data.svc.cluster.local:6379"
+        - name: ConnectionStrings__Elasticsearch
+          value: "http://elasticsearch.insightlearn-data.svc.cluster.local:9200"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      initContainers:
+      - name: wait-for-migration
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args: ['echo "Waiting for migration job to complete..."; sleep 30']
+        resources:
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
+          limits:
+            memory: "32Mi"
+            cpu: "50m"

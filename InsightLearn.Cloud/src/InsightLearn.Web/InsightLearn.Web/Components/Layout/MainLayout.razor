@@ -1,0 +1,123 @@
+﻿@inherits LayoutComponentBase
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(ViewData["Title"] ?? "Learn Without Limits | InsightLearn")</title>
+    <link href="/css/design-system/variables.css" rel="stylesheet" />
+    <link href="/css/udemy-style.css" rel="stylesheet" />
+</head>
+<body>
+    <!-- Udemy-style Header -->
+    <header class="udemy-header">
+        <nav class="udemy-nav">
+            <!-- Logo -->
+            <a href="/" class="udemy-logo">InsightLearn</a>
+
+            <!-- Categories Dropdown -->
+            <div style="position: relative;">
+                <button class="udemy-nav-link" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    Categories
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6,9 12,15 18,9"></polyline>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="udemy-search-container">
+                <input type="text"
+                       placeholder="Search for anything"
+                       class="udemy-search-input">
+                <button class="udemy-search-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Navigation Links -->
+            <div class="udemy-nav-links">
+                <a href="/teach" class="udemy-nav-link">Teach on InsightLearn</a>
+                <a href="/business" class="udemy-nav-link">InsightLearn Business</a>
+
+                <!-- Shopping Cart -->
+                <button style="background: none; border: none; cursor: pointer; padding: 8px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="8" cy="21" r="1"></circle>
+                        <circle cx="19" cy="21" r="1"></circle>
+                        <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path>
+                    </svg>
+                </button>
+
+                <!-- User Menu / Auth -->
+                <a href="/login" class="udemy-btn udemy-btn-outline">Log in</a>
+                <a href="/register" class="udemy-btn udemy-btn-primary">Sign up</a>
+
+                <!-- Global Menu -->
+                <button style="background: none; border: none; cursor: pointer; padding: 8px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main style="min-height: calc(100vh - 72px);">
+        @Body
+    </main>
+
+    <!-- Udemy-style Footer -->
+    <footer class="udemy-footer">
+        <div class="udemy-footer-content">
+            <div class="udemy-footer-grid">
+                <div class="udemy-footer-section">
+                    <h3>InsightLearn Business</h3>
+                    <ul class="udemy-footer-links">
+                        <li><a href="/business">Teach on InsightLearn</a></li>
+                        <li><a href="/business/team">Get the app</a></li>
+                        <li><a href="/business/about">About us</a></li>
+                        <li><a href="/business/contact">Contact us</a></li>
+                    </ul>
+                </div>
+                <div class="udemy-footer-section">
+                    <h3>Careers</h3>
+                    <ul class="udemy-footer-links">
+                        <li><a href="/careers">Blog</a></li>
+                        <li><a href="/careers/help">Help and Support</a></li>
+                        <li><a href="/careers/affiliate">Affiliate</a></li>
+                        <li><a href="/careers/investors">Investors</a></li>
+                    </ul>
+                </div>
+                <div class="udemy-footer-section">
+                    <h3>Terms</h3>
+                    <ul class="udemy-footer-links">
+                        <li><a href="/terms">Terms</a></li>
+                        <li><a href="/privacy">Privacy policy</a></li>
+                        <li><a href="/cookie-settings">Cookie settings</a></li>
+                        <li><a href="/sitemap">Sitemap</a></li>
+                        <li><a href="/accessibility">Accessibility statement</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="udemy-footer-bottom">
+                <div class="udemy-footer-logo">InsightLearn</div>
+                <div class="udemy-footer-copyright">© 2024 InsightLearn, Inc.</div>
+            </div>
+        </div>
+    </footer>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+</body>
+</html>

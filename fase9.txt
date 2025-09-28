@@ -1,0 +1,1923 @@
+# Prompt per Claude Code - FASE 9: Monitoring e Analytics con Sistema Avanzato di Command Control
+
+## 🎯 Obiettivo della Fase
+Implementare un sistema completo di monitoring, analytics e logging per InsightLearn.Cloud con un framework avanzato di controllo dei comandi bash che include retry automatico, error detection e logging strutturato.
+
+## 📋 Template Operativo per Debian con Error Handling Avanzato
+
+### Sistema di Controllo Comandi con Auto-Recovery
+
+```bash
+#!/bin/bash
+# advanced_command_executor.sh - Sistema avanzato di esecuzione comandi con retry
+
+set -e
+set -u
+
+# Configurazioni globali
+SUDO_PASS="SS1-Temp1234"
+MAX_RETRIES=5
+RETRY_DELAY=10
+TIMEOUT_SECONDS=600
+BASE_LOG_DIR="logs/monitoring"
+
+# Funzione di logging strutturato
+structured_log() {
+    local level="$1"
+    local component="$2"
+    local message="$3"
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
+    local log_entry="{\"timestamp\":\"$timestamp\",\"level\":\"$level\",\"component\":\"$component\",\"message\":\"$message\"}"
+    
+    echo "$log_entry" | tee -a "$BASE_LOG_DIR/structured.log"
+    echo "[$timestamp] [$level] [$component] $message" | tee -a "$BASE_LOG_DIR/readable.log"
+}
+
+# Funzione di controllo errori avanzata
+advanced_error_handler() {
+    local exit_code=$1
+    local line_number=$2
+    local command="$3"
+    local attempt="$4"
+    local max_attempts="$5"
+    
+    structured_log "ERROR" "COMMAND_EXECUTOR" "Command failed: $command (attempt $attempt/$max_attempts, exit code $exit_code, line $line_number)"
+    
+    if [ $attempt -lt $max_attempts ]; then
+        structured_log "INFO" "RETRY_HANDLER" "Retrying command in $RETRY_DELAY seconds (attempt $(($attempt + 1))/$max_attempts)"
+        sleep $RETRY_DELAY
+        return 0  # Continue retry loop
+    else
+        structured_log "CRITICAL" "COMMAND_EXECUTOR" "Command failed permanently after $max_attempts attempts: $command"
+        return 1  # Exit retry loop
+    fi
+}
+
+# Esecutore di comandi con retry automatico
+execute_command_with_retry() {
+    local command="$1"
+    local description="$2"
+    local component="${3:-GENERAL}"
+    local log_file="$BASE_LOG_DIR/${component,,}_$(date +%Y%m%d_%H%M%S).log"
+    
+    mkdir -p "$BASE_LOG_DIR"
+    structured_log "INFO" "$component" "Starting: $description"
+    
+    local attempt=1
+    while [ $attempt -le $MAX_RETRIES ]; do
+        structured_log "INFO" "$component" "Executing command (attempt $attempt/$MAX_RETRIES): $command"
+        
+        # Esegui comando con timeout e cattura output
+        if timeout $TIMEOUT_SECONDS bash -c "$command" > "$log_file" 2>&1; then
+            structured_log "SUCCESS" "$component" "Command completed successfully: $description"
+            
+            # Analizza il log per warnings
+            if grep -qi "warning\|warn" "$log_file"; then
+                structured_log "WARNING" "$component" "Command completed with warnings, check log: $log_file"
+            fi
+            
+            return 0
+        else
+            local exit_code=$?
+            
+            # Analizza il log per dettagli dell'errore
+            local error_details=""
+            if [ -f "$log_file" ]; then
+                error_details=$(tail -n 5 "$log_file" | tr '\n' ' ')
+            fi
+            
+            structured_log "ERROR" "$component" "Command failed with exit code $exit_code: $error_details"
+            
+            if ! advanced_error_handler $exit_code $LINENO "$command" $attempt $MAX_RETRIES; then
+                return 1
+            fi
+            
+            ((attempt++))
+        fi
+    done
+    
+    return 1
+}
+
+# Funzione sudo con retry
+sudo_cmd_retry() {
+    local cmd="$*"
+    execute_command_with_retry "echo '$SUDO_PASS' | sudo -S $cmd 2>/dev/null || sudo $cmd" "Sudo command: $cmd" "SUDO"
+}
+```
+
+## 🚀 FASE 9: Monitoring e Analytics Implementation
+
+### STEP 9.1: Setup Prometheus e Grafana
+
+**Comando da eseguire:**
+```bash
+#!/bin/bash
+# phase9_step1_prometheus_setup.sh
+
+source advanced_command_executor.sh
+
+echo "=== [$(date)] FASE 9 STEP 1: Prometheus e Grafana Setup ===" | tee -a "$BASE_LOG_DIR/phase9_step1.log"
+
+cd InsightLearn.Cloud
+
+# Crea namespace per monitoring
+execute_command_with_retry \
+    "kubectl create namespace insightlearn-monitoring --dry-run=client -o yaml | kubectl apply -f -" \
+    "Create monitoring namespace" \
+    "KUBERNETES"
+
+# Crea Prometheus ConfigMap
+execute_command_with_retry \
+    "cat > kubernetes/monitoring/prometheus-config.yaml << 'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: insightlearn-monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    
+    rule_files:
+      - '/etc/prometheus/rules/*.yml'
+    
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+    
+    scrape_configs:
+      # Prometheus self-monitoring
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      
+      # Kubernetes API server
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+      
+      # Kubernetes nodes
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+      
+      # Kubernetes pods
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: \${1}:\${2}
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+      
+      # InsightLearn specific services
+      - job_name: 'insightlearn-web'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - insightlearn
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: insightlearn-web-service
+      
+      - job_name: 'insightlearn-api'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - insightlearn
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: insightlearn-api-service
+      
+      # Database monitoring
+      - job_name: 'sqlserver'
+        static_configs:
+          - targets: ['sqlserver-exporter:9399']
+      
+      - job_name: 'mongodb'
+        static_configs:
+          - targets: ['mongodb-exporter:9216']
+      
+      - job_name: 'redis'
+        static_configs:
+          - targets: ['redis-exporter:9121']
+      
+      - job_name: 'elasticsearch'
+        static_configs:
+          - targets: ['elasticsearch-exporter:9114']
+EOF" \
+    "Create Prometheus configuration" \
+    "CONFIG"
+
+# Crea Prometheus Deployment
+execute_command_with_retry \
+    "cat > kubernetes/monitoring/prometheus-deployment.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: insightlearn-monitoring
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.45.0
+        ports:
+        - containerPort: 9090
+        args:
+          - '--config.file=/etc/prometheus/prometheus.yml'
+          - '--storage.tsdb.path=/prometheus/'
+          - '--web.console.libraries=/etc/prometheus/console_libraries'
+          - '--web.console.templates=/etc/prometheus/consoles'
+          - '--storage.tsdb.retention.time=30d'
+          - '--web.enable-lifecycle'
+          - '--web.enable-admin-api'
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus/
+        - name: prometheus-storage
+          mountPath: /prometheus/
+        resources:
+          requests:
+            memory: '512Mi'
+            cpu: '250m'
+          limits:
+            memory: '1Gi'
+            cpu: '500m'
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+      volumes:
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+      - name: prometheus-storage
+        persistentVolumeClaim:
+          claimName: prometheus-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-storage
+  namespace: insightlearn-monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: insightlearn-monitoring
+  labels:
+    app: prometheus
+spec:
+  ports:
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: prometheus
+  type: ClusterIP
+EOF" \
+    "Create Prometheus deployment manifest" \
+    "MANIFEST"
+
+# Crea Grafana ConfigMap per datasources
+execute_command_with_retry \
+    "cat > kubernetes/monitoring/grafana-config.yaml << 'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: insightlearn-monitoring
+data:
+  prometheus.yaml: |-
+    {
+        \"apiVersion\": 1,
+        \"datasources\": [
+            {
+                \"name\": \"Prometheus\",
+                \"type\": \"prometheus\",
+                \"url\": \"http://prometheus:9090\",
+                \"access\": \"proxy\",
+                \"isDefault\": true
+            }
+        ]
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-config
+  namespace: insightlearn-monitoring
+data:
+  dashboards.yaml: |-
+    {
+        \"apiVersion\": 1,
+        \"providers\": [
+            {
+                \"name\": \"default\",
+                \"orgId\": 1,
+                \"folder\": \"\",
+                \"type\": \"file\",
+                \"disableDeletion\": false,
+                \"updateIntervalSeconds\": 10,
+                \"options\": {
+                    \"path\": \"/var/lib/grafana/dashboards\"
+                }
+            }
+        ]
+    }
+EOF" \
+    "Create Grafana configuration" \
+    "CONFIG"
+
+structured_log "SUCCESS" "STEP_9_1" "Prometheus e Grafana setup completato"
+```
+
+### STEP 9.2: Dashboard Personalizzati per InsightLearn
+
+**Comando da eseguire dopo successo Step 9.1:**
+```bash
+#!/bin/bash
+# phase9_step2_custom_dashboards.sh
+
+source advanced_command_executor.sh
+
+echo "=== [$(date)] FASE 9 STEP 2: Custom Dashboards Creation ===" | tee -a "$BASE_LOG_DIR/phase9_step2.log"
+
+cd InsightLearn.Cloud
+
+# Crea dashboard per Application Performance
+execute_command_with_retry \
+    "mkdir -p kubernetes/monitoring/dashboards" \
+    "Create dashboards directory" \
+    "FILESYSTEM"
+
+execute_command_with_retry \
+    "cat > kubernetes/monitoring/dashboards/insightlearn-overview.json << 'EOF'
+{
+  \"dashboard\": {
+    \"id\": null,
+    \"title\": \"InsightLearn.Cloud - Overview\",
+    \"description\": \"Panoramica generale della piattaforma InsightLearn.Cloud\",
+    \"tags\": [\"insightlearn\", \"overview\"],
+    \"timezone\": \"browser\",
+    \"panels\": [
+      {
+        \"id\": 1,
+        \"title\": \"Total Users\",
+        \"type\": \"stat\",
+        \"targets\": [
+          {
+            \"expr\": \"insightlearn_total_users\",
+            \"format\": \"time_series\",
+            \"legendFormat\": \"Users\"
+          }
+        ],
+        \"gridPos\": {\"h\": 8, \"w\": 6, \"x\": 0, \"y\": 0},
+        \"options\": {
+          \"reduceOptions\": {
+            \"values\": false,
+            \"calcs\": [\"lastNotNull\"],
+            \"fields\": \"\"
+          },
+          \"orientation\": \"auto\",
+          \"textMode\": \"auto\",
+          \"colorMode\": \"value\"
+        }
+      },
+      {
+        \"id\": 2,
+        \"title\": \"Active Courses\",
+        \"type\": \"stat\",
+        \"targets\": [
+          {
+            \"expr\": \"insightlearn_active_courses\",
+            \"format\": \"time_series\",
+            \"legendFormat\": \"Courses\"
+          }
+        ],
+        \"gridPos\": {\"h\": 8, \"w\": 6, \"x\": 6, \"y\": 0}
+      },
+      {
+        \"id\": 3,
+        \"title\": \"Response Time\",
+        \"type\": \"graph\",
+        \"targets\": [
+          {
+            \"expr\": \"histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\\\"insightlearn-web\\\"}[5m])) by (le))\",
+            \"legendFormat\": \"50th percentile\"
+          },
+          {
+            \"expr\": \"histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\\\"insightlearn-web\\\"}[5m])) by (le))\",
+            \"legendFormat\": \"95th percentile\"
+          }
+        ],
+        \"gridPos\": {\"h\": 8, \"w\": 12, \"x\": 12, \"y\": 0},
+        \"yAxes\": [
+          {
+            \"label\": \"seconds\",
+            \"min\": null,
+            \"max\": null,
+            \"logBase\": 1
+          }
+        ]
+      },
+      {
+        \"id\": 4,
+        \"title\": \"Error Rate\",
+        \"type\": \"graph\",
+        \"targets\": [
+          {
+            \"expr\": \"sum(rate(http_requests_total{job=\\\"insightlearn-web\\\",status=~\\\"5..\\\"}[5m])) / sum(rate(http_requests_total{job=\\\"insightlearn-web\\\"}[5m]))\",
+            \"legendFormat\": \"Error Rate\"
+          }
+        ],
+        \"gridPos\": {\"h\": 8, \"w\": 12, \"x\": 0, \"y\": 8},
+        \"yAxes\": [
+          {
+            \"label\": \"percentage\",
+            \"min\": 0,
+            \"max\": 1
+          }
+        ]
+      },
+      {
+        \"id\": 5,
+        \"title\": \"AI Service Performance\",
+        \"type\": \"graph\",
+        \"targets\": [
+          {
+            \"expr\": \"rate(ollama_requests_total[5m])\",
+            \"legendFormat\": \"AI Requests/sec\"
+          },
+          {
+            \"expr\": \"histogram_quantile(0.95, rate(ollama_request_duration_seconds_bucket[5m]))\",
+            \"legendFormat\": \"95th percentile latency\"
+          }
+        ],
+        \"gridPos\": {\"h\": 8, \"w\": 12, \"x\": 12, \"y\": 8}
+      }
+    ],
+    \"time\": {
+      \"from\": \"now-1h\",
+      \"to\": \"now\"
+    },
+    \"refresh\": \"30s\"
+  }
+}
+EOF" \
+    "Create InsightLearn overview dashboard" \
+    "DASHBOARD"
+
+# Dashboard per Infrastructure Monitoring
+execute_command_with_retry \
+    "cat > kubernetes/monitoring/dashboards/infrastructure-monitoring.json << 'EOF'
+{
+  \"dashboard\": {
+    \"title\": \"Infrastructure Monitoring\",
+    \"panels\": [
+      {
+        \"id\": 1,
+        \"title\": \"Pod Status\",
+        \"type\": \"graph\",
+        \"targets\": [
+          {
+            \"expr\": \"kube_pod_status_phase{namespace=\\\"insightlearn\\\"}\",
+            \"legendFormat\": \"{{pod}} - {{phase}}\"
+          }
+        ]
+      },
+      {
+        \"id\": 2,
+        \"title\": \"Memory Usage\",
+        \"type\": \"graph\",
+        \"targets\": [
+          {
+            \"expr\": \"container_memory_usage_bytes{namespace=\\\"insightlearn\\\"} / 1024 / 1024\",
+            \"legendFormat\": \"{{pod}} - {{container}}\"
+          }
+        ]
+      },
+      {
+        \"id\": 3,
+        \"title\": \"CPU Usage\",
+        \"type\": \"graph\",
+        \"targets\": [
+          {
+            \"expr\": \"rate(container_cpu_usage_seconds_total{namespace=\\\"insightlearn\\\"}[5m]) * 100\",
+            \"legendFormat\": \"{{pod}} - {{container}}\"
+          }
+        ]
+      },
+      {
+        \"id\": 4,
+        \"title\": \"Database Connections\",
+        \"type\": \"graph\",
+        \"targets\": [
+          {
+            \"expr\": \"sqlserver_connections\",
+            \"legendFormat\": \"SQL Server\"
+          },
+          {
+            \"expr\": \"mongodb_connections\",
+            \"legendFormat\": \"MongoDB\"
+          },
+          {
+            \"expr\": \"redis_connected_clients\",
+            \"legendFormat\": \"Redis\"
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF" \
+    "Create infrastructure monitoring dashboard" \
+    "DASHBOARD"
+
+structured_log "SUCCESS" "STEP_9_2" "Custom dashboards creation completato"
+```
+
+### STEP 9.3: Alerting Rules e Notification Setup
+
+**Comando da eseguire dopo successo Step 9.2:**
+```bash
+#!/bin/bash
+# phase9_step3_alerting_setup.sh
+
+source advanced_command_executor.sh
+
+echo "=== [$(date)] FASE 9 STEP 3: Alerting Setup ===" | tee -a "$BASE_LOG_DIR/phase9_step3.log"
+
+cd InsightLearn.Cloud
+
+# Crea AlertManager configuration
+execute_command_with_retry \
+    "cat > kubernetes/monitoring/alertmanager-config.yaml << 'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: insightlearn-monitoring
+data:
+  config.yml: |
+    global:
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'alerts@insightlearn.cloud'
+      smtp_require_tls: false
+    
+    route:
+      group_by: ['alertname']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'web.hook'
+      routes:
+      - match:
+          severity: critical
+        receiver: critical-alerts
+      - match:
+          severity: warning
+        receiver: warning-alerts
+    
+    receivers:
+    - name: 'web.hook'
+      webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+    
+    - name: 'critical-alerts'
+      email_configs:
+      - to: 'admin@insightlearn.cloud'
+        subject: 'CRITICAL: {{.GroupLabels.alertname}}'
+        body: |
+          {{range .Alerts}}
+          Alert: {{.Annotations.summary}}
+          Description: {{.Annotations.description}}
+          {{end}}
+      webhook_configs:
+      - url: 'http://localhost:5001/critical-webhook'
+    
+    - name: 'warning-alerts'
+      email_configs:
+      - to: 'monitoring@insightlearn.cloud'
+        subject: 'WARNING: {{.GroupLabels.alertname}}'
+        body: |
+          {{range .Alerts}}
+          Alert: {{.Annotations.summary}}
+          Description: {{.Annotations.description}}
+          {{end}}
+    
+    inhibit_rules:
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      equal: ['alertname', 'dev', 'instance']
+EOF" \
+    "Create AlertManager configuration" \
+    "CONFIG"
+
+# Crea Prometheus Alert Rules
+execute_command_with_retry \
+    "cat > kubernetes/monitoring/prometheus-rules.yaml << 'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: insightlearn-monitoring
+data:
+  insightlearn.yml: |
+    groups:
+    - name: insightlearn.rules
+      rules:
+      
+      # Application Level Alerts
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{job=\"insightlearn-web\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"insightlearn-web\"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: \"High error rate detected\"
+          description: \"Error rate is above 5% for more than 5 minutes\"
+      
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"insightlearn-web\"}[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: \"High response time detected\"
+          description: \"95th percentile response time is above 2 seconds\"
+      
+      - alert: DatabaseConnectionHigh
+        expr: sqlserver_connections > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: \"High database connections\"
+          description: \"SQL Server connections are above 80\"
+      
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total{namespace=\"insightlearn\"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: \"Pod is crash looping\"
+          description: \"Pod {{$labels.pod}} in namespace {{$labels.namespace}} is restarting frequently\"
+      
+      # Infrastructure Level Alerts
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes{namespace=\"insightlearn\"} / container_spec_memory_limit_bytes{namespace=\"insightlearn\"}) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: \"High memory usage\"
+          description: \"Container {{$labels.container}} in pod {{$labels.pod}} is using more than 90% of memory\"
+      
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{namespace=\"insightlearn\"}[5m]) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: \"High CPU usage\"
+          description: \"Container {{$labels.container}} in pod {{$labels.pod}} is using more than 90% CPU\"
+      
+      # AI Service Alerts
+      - alert: AIServiceDown
+        expr: up{job=\"ollama\"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: \"AI service is down\"
+          description: \"Ollama AI service is not responding\"
+      
+      - alert: AIHighLatency
+        expr: histogram_quantile(0.95, rate(ollama_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: \"AI service high latency\"
+          description: \"95th percentile AI response time is above 5 seconds\"
+      
+      # Storage Alerts
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: \"Low disk space\"
+          description: \"Disk space is below 20% on {{$labels.instance}}\"
+      
+      - alert: RedisDown
+        expr: up{job=\"redis\"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: \"Redis is down\"
+          description: \"Redis cache service is not responding\"
+EOF" \
+    "Create Prometheus alert rules" \
+    "ALERTING"
+
+structured_log "SUCCESS" "STEP_9_3" "Alerting setup completato"
+```
+
+### STEP 9.4: Sistema di Command Logging e Analytics
+
+**Comando da eseguire dopo successo Step 9.3:**
+```bash
+#!/bin/bash
+# phase9_step4_command_analytics.sh
+
+source advanced_command_executor.sh
+
+echo "=== [$(date)] FASE 9 STEP 4: Command Analytics System ===" | tee -a "$BASE_LOG_DIR/phase9_step4.log"
+
+cd InsightLearn.Cloud
+
+# Crea sistema avanzato di analytics per comandi
+execute_command_with_retry \
+    "mkdir -p scripts/monitoring" \
+    "Create monitoring scripts directory" \
+    "FILESYSTEM"
+
+# Script di analytics per comandi bash
+execute_command_with_retry \
+    "cat > scripts/monitoring/command_analytics.sh << 'EOF'
+#!/bin/bash
+# command_analytics.sh - Sistema di analytics per comandi bash
+
+set -e
+set -u
+
+ANALYTICS_LOG_DIR=\"logs/analytics\"
+COMMAND_STATS_FILE=\"\$ANALYTICS_LOG_DIR/command_stats.json\"
+EXECUTION_LOG_FILE=\"\$ANALYTICS_LOG_DIR/execution_history.log\"
+
+mkdir -p \"\$ANALYTICS_LOG_DIR\"
+
+# Funzione per registrare statistiche comando
+record_command_execution() {
+    local command=\"\$1\"
+    local exit_code=\"\$2\"
+    local duration=\"\$3\"
+    local component=\"\$4\"
+    local timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%S.%3NZ\")
+    
+    # Crea entry JSON per statistiche
+    local stats_entry=\"{
+        \\\"timestamp\\\": \\\"\$timestamp\\\",
+        \\\"command\\\": \\\"\$command\\\",
+        \\\"component\\\": \\\"\$component\\\",
+        \\\"exit_code\\\": \$exit_code,
+        \\\"duration_seconds\\\": \$duration,
+        \\\"success\\\": \$([ \$exit_code -eq 0 ] && echo 'true' || echo 'false')
+    }\"
+    
+    echo \"\$stats_entry\" >> \"\$COMMAND_STATS_FILE\"
+    echo \"[\$timestamp] [\$component] Command: \$command | Exit: \$exit_code | Duration: \${duration}s\" >> \"\$EXECUTION_LOG_FILE\"
+}
+
+# Funzione per generare report analytics
+generate_analytics_report() {
+    local report_file=\"\$ANALYTICS_LOG_DIR/analytics_report_\$(date +%Y%m%d_%H%M%S).md\"
+    
+    echo \"# InsightLearn.Cloud - Command Analytics Report\" > \"\$report_file\"
+    echo \"\" >> \"\$report_file\"
+    echo \"**Generated:** \$(date)\" >> \"\$report_file\"
+    echo \"\" >> \"\$report_file\"
+    
+    if [ -f \"\$COMMAND_STATS_FILE\" ]; then
+        local total_commands=\$(wc -l < \"\$COMMAND_STATS_FILE\")
+        local failed_commands=\$(jq -s '[.[] | select(.success == false)] | length' \"\$COMMAND_STATS_FILE\" 2>/dev/null || echo \"0\")
+        local success_rate=\$(echo \"scale=2; (\$total_commands - \$failed_commands) * 100 / \$total_commands\" | bc -l 2>/dev/null || echo \"100\")
+        
+        echo \"## 📊 Summary Statistics\" >> \"\$report_file\"
+        echo \"\" >> \"\$report_file\"
+        echo \"- **Total Commands Executed:** \$total_commands\" >> \"\$report_file\"
+        echo \"- **Successful Commands:** \$((\$total_commands - \$failed_commands))\" >> \"\$report_file\"
+        echo \"- **Failed Commands:** \$failed_commands\" >> \"\$report_file\"
+        echo \"- **Success Rate:** \$success_rate%\" >> \"\$report_file\"
+        echo \"\" >> \"\$report_file\"
+        
+        # Top failing commands
+        echo \"## ❌ Most Failed Commands\" >> \"\$report_file\"
+        echo \"\" >> \"\$report_file\"
+        if command -v jq > /dev/null 2>&1; then
+            jq -s '[.[] | select(.success == false)] | group_by(.command) | map({command: .[0].command, count: length}) | sort_by(.count) | reverse | .[0:5]' \"\$COMMAND_STATS_FILE\" 2>/dev/null >> \"\$report_file\" || echo \"Unable to process failure statistics\" >> \"\$report_file\"
+        fi
+        echo \"\" >> \"\$report_file\"
+        
+        # Average execution times by component
+        echo \"## ⏱️ Average Execution Times by Component\" >> \"\$report_file\"
+        echo \"\" >> \"\$report_file\"
+        if command -v jq > /dev/null 2>&1; then
+            jq -s 'group_by(.component) | map({component: .[0].component, avg_duration: (map(.duration_seconds) | add / length), count: length})' \"\$COMMAND_STATS_FILE\" 2>/dev/null >> \"\$report_file\" || echo \"Unable to process timing statistics\" >> \"\$report_file\"
+        fi
+    else
+        echo \"## ⚠️ No Data Available\" >> \"\$report_file\"
+        echo \"\" >> \"\$report_file\"
+        echo \"No command execution data found. Execute some monitored commands first.\" >> \"\$report_file\"
+    fi
+    
+    echo \"Analytics report generated: \$report_file\"
+    return 0
+}
+
+# Esporta funzioni per uso esterno
+export -f record_command_execution
+export -f generate_analytics_report
+EOF" \
+    "Create command analytics system" \
+    "ANALYTICS"
+
+# Enhanced command executor con analytics
+execute_command_with_retry \
+    "cat > scripts/monitoring/enhanced_executor.sh << 'EOF'
+#!/bin/bash
+# enhanced_executor.sh - Esecutore comandi con analytics integrato
+
+set -e
+set -u
+
+source \"scripts/monitoring/command_analytics.sh\"
+
+# Configurazioni
+SUDO_PASS=\"SS1-Temp1234\"
+MAX_RETRIES=5
+RETRY_DELAY=10
+TIMEOUT_SECONDS=600
+BASE_LOG_DIR=\"logs/monitoring\"
+ANALYTICS_ENABLED=true
+
+# Funzione enhanced di esecuzione con analytics
+execute_monitored_command() {
+    local command=\"\$1\"
+    local description=\"\$2\"
+    local component=\"\${3:-GENERAL}\"
+    local log_file=\"\$BASE_LOG_DIR/\${component,,}_\$(date +%Y%m%d_%H%M%S).log\"
+    
+    mkdir -p \"\$BASE_LOG_DIR\"
+    
+    local start_time=\$(date +%s)
+    local attempt=1
+    local final_exit_code=1
+    
+    echo \"[INFO] [\$component] Starting: \$description\"
+    
+    while [ \$attempt -le \$MAX_RETRIES ]; do
+        echo \"[INFO] [\$component] Executing (attempt \$attempt/\$MAX_RETRIES): \$command\"
+        
+        local attempt_start=\$(date +%s)
+        
+        # Esegui comando con timeout
+        if timeout \$TIMEOUT_SECONDS bash -c \"\$command\" > \"\$log_file\" 2>&1; then
+            local attempt_end=\$(date +%s)
+            local attempt_duration=\$((\$attempt_end - \$attempt_start))
+            final_exit_code=0
+            
+            echo \"[SUCCESS] [\$component] Command completed: \$description (duration: \${attempt_duration}s)\"
+            
+            # Verifica warnings nel log
+            if grep -qi \"warning\\|warn\" \"\$log_file\"; then
+                echo \"[WARNING] [\$component] Command completed with warnings, check: \$log_file\"
+            fi
+            
+            break
+        else
+            local attempt_exit_code=\$?
+            local attempt_end=\$(date +%s)
+            local attempt_duration=\$((\$attempt_end - \$attempt_start))
+            
+            echo \"[ERROR] [\$component] Command failed (attempt \$attempt/\$MAX_RETRIES, exit: \$attempt_exit_code, duration: \${attempt_duration}s)\"
+            
+            # Analizza errori nel log
+            if [ -f \"\$log_file\" ]; then
+                local error_summary=\$(tail -n 3 \"\$log_file\" | tr '\\n' ' ' | head -c 200)
+                echo \"[ERROR] [\$component] Error details: \$error_summary\"
+            fi
+            
+            if [ \$attempt -lt \$MAX_RETRIES ]; then
+                echo \"[INFO] [\$component] Retrying in \$RETRY_DELAY seconds...\"
+                sleep \$RETRY_DELAY
+                ((attempt++))
+            else
+                echo \"[CRITICAL] [\$component] Command failed permanently after \$MAX_RETRIES attempts\"
+                final_exit_code=\$attempt_exit_code
+                break
+            fi
+        fi
+    done
+    
+    # Registra analytics se abilitato
+    if [ \"\$ANALYTICS_ENABLED\" = \"true\" ]; then
+        local end_time=\$(date +%s)
+        local total_duration=\$((\$end_time - \$start_time))
+        record_command_execution \"\$command\" \$final_exit_code \$total_duration \"\$component\"
+    fi
+    
+    return \$final_exit_code
+}
+
+# Wrapper per comandi sudo
+sudo_monitored_cmd() {
+    local cmd=\"\$*\"
+    execute_monitored_command \"echo '\$SUDO_PASS' | sudo -S \$cmd 2>/dev/null || sudo \$cmd\" \"Sudo command: \$cmd\" \"SUDO\"
+}
+
+# Funzione per il health check completo del sistema
+system_health_check() {
+    local health_report=\"\$BASE_LOG_DIR/health_check_\$(date +%Y%m%d_%H%M%S).log\"
+    local all_passed=true
+    
+    echo \"=== InsightLearn.Cloud System Health Check ===\" | tee \"\$health_report\"
+    echo \"Timestamp: \$(date)\" | tee -a \"\$health_report\"
+    echo \"\" | tee -a \"\$health_report\"
+    
+    # Test Docker
+    if execute_monitored_command \"docker --version\" \"Docker version check\" \"DOCKER\"; then
+        echo \"✅ Docker: OK\" | tee -a \"\$health_report\"
+    else
+        echo \"❌ Docker: FAILED\" | tee -a \"\$health_report\"
+        all_passed=false
+    fi
+    
+    # Test Kubernetes
+    if execute_monitored_command \"kubectl cluster-info\" \"Kubernetes cluster check\" \"KUBERNETES\"; then
+        echo \"✅ Kubernetes: OK\" | tee -a \"\$health_report\"
+    else
+        echo \"❌ Kubernetes: FAILED\" | tee -a \"\$health_report\"
+        all_passed=false
+    fi
+    
+    # Test namespace
+    if execute_monitored_command \"kubectl get namespace insightlearn\" \"InsightLearn namespace check\" \"KUBERNETES\"; then
+        echo \"✅ InsightLearn Namespace: OK\" | tee -a \"\$health_report\"
+    else
+        echo \"❌ InsightLearn Namespace: FAILED\" | tee -a \"\$health_report\"
+        all_passed=false
+    fi
+    
+    # Test monitoring namespace
+    if execute_monitored_command \"kubectl get namespace insightlearn-monitoring\" \"Monitoring namespace check\" \"KUBERNETES\"; then
+        echo \"✅ Monitoring Namespace: OK\" | tee -a \"\$health_report\"
+    else
+        echo \"❌ Monitoring Namespace: FAILED\" | tee -a \"\$health_report\"
+        all_passed=false
+    fi
+    
+    echo \"\" | tee -a \"\$health_report\"
+    if [ \"\$all_passed\" = \"true\" ]; then
+        echo \"🎉 Overall System Health: PASSED\" | tee -a \"\$health_report\"
+        return 0
+    else
+        echo \"⚠️  Overall System Health: ISSUES DETECTED\" | tee -a \"\$health_report\"
+        return 1
+    fi
+}
+
+# Esporta funzioni
+export -f execute_monitored_command
+export -f sudo_monitored_cmd
+export -f system_health_check
+EOF" \
+    "Create enhanced command executor with analytics" \
+    "EXECUTOR"
+
+# Rendi executable gli scripts
+execute_command_with_retry \
+    "chmod +x scripts/monitoring/*.sh" \
+    "Make monitoring scripts executable" \
+    "PERMISSIONS"
+
+structured_log "SUCCESS" "STEP_9_4" "Command analytics system setup completato"
+```
+
+### STEP 9.5: Business Analytics e User Behavior Tracking
+
+**Comando da eseguire dopo successo Step 9.4:**
+```bash
+#!/bin/bash
+# phase9_step5_business_analytics.sh
+
+source scripts/monitoring/enhanced_executor.sh
+
+echo "=== [$(date)] FASE 9 STEP 5: Business Analytics Setup ===" | tee -a "$BASE_LOG_DIR/phase9_step5.log"
+
+cd InsightLearn.Cloud
+
+# Crea struttura per business analytics
+execute_monitored_command \
+    "mkdir -p src/InsightLearn.Analytics/{Services,Models,Controllers,Middleware}" \
+    "Create analytics project structure" \
+    "ANALYTICS"
+
+# Crea service per business analytics
+execute_monitored_command \
+    "cat > src/InsightLearn.Analytics/Services/BusinessAnalyticsService.cs << 'EOF'
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
+
+namespace InsightLearn.Analytics.Services
+{
+    public class BusinessAnalyticsService
+    {
+        private readonly ILogger<BusinessAnalyticsService> _logger;
+        private readonly string _analyticsLogPath;
+        
+        public BusinessAnalyticsService(ILogger<BusinessAnalyticsService> logger)
+        {
+            _logger = logger;
+            _analyticsLogPath = Path.Combine(\"logs\", \"business-analytics.jsonl\");
+            Directory.CreateDirectory(Path.GetDirectoryName(_analyticsLogPath));
+        }
+        
+        public async Task TrackUserRegistration(string userId, Dictionary<string, object> metadata)
+        {
+            var analyticsEvent = new
+            {
+                Timestamp = DateTime.UtcNow,
+                EventType = \"user_registration\",
+                UserId = userId,
+                Metadata = metadata
+            };
+            
+            await LogAnalyticsEvent(analyticsEvent);
+            _logger.LogInformation(\"User registration tracked: {UserId}\", userId);
+        }
+        
+        public async Task TrackCourseEnrollment(string userId, string courseId, decimal price)
+        {
+            var analyticsEvent = new
+            {
+                Timestamp = DateTime.UtcNow,
+                EventType = \"course_enrollment\",
+                UserId = userId,
+                CourseId = courseId,
+                Price = price,
+                Metadata = new
+                {
+                    RevenueImpact = price,
+                    ConversionPoint = \"enrollment\"
+                }
+            };
+            
+            await LogAnalyticsEvent(analyticsEvent);
+            _logger.LogInformation(\"Course enrollment tracked: {UserId} -> {CourseId}\", userId, courseId);
+        }
+        
+        public async Task TrackCourseCompletion(string userId, string courseId, TimeSpan completionTime)
+        {
+            var analyticsEvent = new
+            {
+                Timestamp = DateTime.UtcNow,
+                EventType = \"course_completion\",
+                UserId = userId,
+                CourseId = courseId,
+                Metadata = new
+                {
+                    CompletionTimeMinutes = completionTime.TotalMinutes,
+                    CompletionPoint = \"course_end\"
+                }
+            };
+            
+            await LogAnalyticsEvent(analyticsEvent);
+            _logger.LogInformation(\"Course completion tracked: {UserId} completed {CourseId}\", userId, courseId);
+        }
+        
+        public async Task TrackAIInteraction(string userId, string interactionType, string aiModel, TimeSpan responseTime)
+        {
+            var analyticsEvent = new
+            {
+                Timestamp = DateTime.UtcNow,
+                EventType = \"ai_interaction\",
+                UserId = userId,
+                Metadata = new
+                {
+                    InteractionType = interactionType,
+                    AIModel = aiModel,
+                    ResponseTimeMs = responseTime.TotalMilliseconds,
+                    ServiceHealth = responseTime.TotalSeconds < 2 ? \"good\" : \"degraded\"
+                }
+            };
+            
+            await LogAnalyticsEvent(analyticsEvent);
+        }
+        
+        public async Task TrackVideoWatched(string userId, string courseId, string videoId, TimeSpan watchTime, TimeSpan totalDuration)
+        {
+            var watchPercentage = watchTime.TotalSeconds / totalDuration.TotalSeconds * 100;
+            
+            var analyticsEvent = new
+            {
+                Timestamp = DateTime.UtcNow,
+                EventType = \"video_watched\",
+                UserId = userId,
+                CourseId = courseId,
+                VideoId = videoId,
+                Metadata = new
+                {
+                    WatchTimeSeconds = watchTime.TotalSeconds,
+                    TotalDurationSeconds = totalDuration.TotalSeconds,
+                    WatchPercentage = watchPercentage,
+                    EngagementLevel = watchPercentage switch
+                    {
+                        >= 90 => \"high\",
+                        >= 50 => \"medium\",
+                        _ => \"low\"
+                    }
+                }
+            };
+            
+            await LogAnalyticsEvent(analyticsEvent);
+        }
+        
+        private async Task LogAnalyticsEvent(object analyticsEvent)
+        {
+            try
+            {
+                var jsonLine = JsonSerializer.Serialize(analyticsEvent, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                
+                await File.AppendAllTextAsync(_analyticsLogPath, jsonLine + Environment.NewLine);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, \"Failed to log analytics event\");
+            }
+        }
+        
+        public async Task<Dictionary<string, object>> GetBusinessMetrics(DateTime fromDate, DateTime toDate)
+        {
+            try
+            {
+                var lines = await File.ReadAllLinesAsync(_analyticsLogPath);
+                var events = lines.Select(line => JsonSerializer.Deserialize<JsonElement>(line))
+                                 .Where(e => 
+                                 {
+                                     if (e.TryGetProperty(\"timestamp\", out var timestampProp))
+                                     {
+                                         if (DateTime.TryParse(timestampProp.GetString(), out var timestamp))
+                                         {
+                                             return timestamp >= fromDate && timestamp <= toDate;
+                                         }
+                                     }
+                                     return false;
+                                 })
+                                 .ToList();
+                
+                var metrics = new Dictionary<string, object>
+                {
+                    [\"totalEvents\"] = events.Count,
+                    [\"uniqueUsers\"] = events.Where(e => e.TryGetProperty(\"userId\", out _))
+                                           .Select(e => e.GetProperty(\"userId\").GetString())
+                                           .Distinct()
+                                           .Count(),
+                    [\"registrations\"] = events.Count(e => e.GetProperty(\"eventType\").GetString() == \"user_registration\"),
+                    [\"enrollments\"] = events.Count(e => e.GetProperty(\"eventType\").GetString() == \"course_enrollment\"),
+                    [\"completions\"] = events.Count(e => e.GetProperty(\"eventType\").GetString() == \"course_completion\"),
+                    [\"aiInteractions\"] = events.Count(e => e.GetProperty(\"eventType\").GetString() == \"ai_interaction\"),
+                    [\"videoWatches\"] = events.Count(e => e.GetProperty(\"eventType\").GetString() == \"video_watched\")
+                };
+                
+                return metrics;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, \"Failed to calculate business metrics\");
+                return new Dictionary<string, object> { [\"error\"] = \"Failed to calculate metrics\" };
+            }
+        }
+    }
+}
+EOF" \
+    "Create business analytics service" \
+    "CSHARP"
+
+# Crea middleware per tracking automatico
+execute_monitored_command \
+    "cat > src/InsightLearn.Analytics/Middleware/AnalyticsMiddleware.cs << 'EOF'
+using InsightLearn.Analytics.Services;
+using Microsoft.AspNetCore.Http;
+using System.Diagnostics;
+using System.Text.Json;
+
+namespace InsightLearn.Analytics.Middleware
+{
+    public class AnalyticsMiddleware
+    {
+        private readonly RequestDelegate _next;
+        private readonly BusinessAnalyticsService _analyticsService;
+        private readonly ILogger<AnalyticsMiddleware> _logger;
+        
+        public AnalyticsMiddleware(RequestDelegate next, BusinessAnalyticsService analyticsService, ILogger<AnalyticsMiddleware> logger)
+        {
+            _next = next;
+            _analyticsService = analyticsService;
+            _logger = logger;
+        }
+        
+        public async Task InvokeAsync(HttpContext context)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var requestPath = context.Request.Path.Value?.ToLowerInvariant();
+            var method = context.Request.Method;
+            
+            try
+            {
+                await _next(context);
+                
+                stopwatch.Stop();
+                
+                // Track significant endpoints
+                await TrackEndpointUsage(context, requestPath, method, stopwatch.Elapsed, context.Response.StatusCode);
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                _logger.LogError(ex, \"Error in analytics middleware for path: {Path}\", requestPath);
+                
+                // Track errors
+                await TrackEndpointError(context, requestPath, method, stopwatch.Elapsed, ex);
+                throw;
+            }
+        }
+        
+        private async Task TrackEndpointUsage(HttpContext context, string path, string method, TimeSpan duration, int statusCode)
+        {
+            // Solo traccia endpoint significativi
+            if (IsSignificantEndpoint(path))
+            {
+                var userId = GetUserIdFromContext(context);
+                
+                var trackingData = new Dictionary<string, object>
+                {
+                    [\"path\"] = path,
+                    [\"method\"] = method,
+                    [\"durationMs\"] = duration.TotalMilliseconds,
+                    [\"statusCode\"] = statusCode,
+                    [\"userAgent\"] = context.Request.Headers[\"User-Agent\"].ToString(),
+                    [\"ipAddress\"] = GetClientIpAddress(context)
+                };
+                
+                // Log structured per Prometheus
+                _logger.LogInformation(\"METRICS: endpoint_request_total{{method=\\\"{Method}\\\",path=\\\"{Path}\\\",status=\\\"{StatusCode}\\\"}} 1\", 
+                    method, path, statusCode);
+                _logger.LogInformation(\"METRICS: endpoint_request_duration_seconds{{method=\\\"{Method}\\\",path=\\\"{Path}\\\"}} {Duration}\", 
+                    method, path, duration.TotalSeconds);
+            }
+        }
+        
+        private async Task TrackEndpointError(HttpContext context, string path, string method, TimeSpan duration, Exception ex)
+        {
+            var userId = GetUserIdFromContext(context);
+            
+            _logger.LogError(\"METRICS: endpoint_error_total{{method=\\\"{Method}\\\",path=\\\"{Path}\\\",error=\\\"{ErrorType}\\\"}} 1\", 
+                method, path, ex.GetType().Name);
+        }
+        
+        private bool IsSignificantEndpoint(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            
+            var significantPaths = new[]
+            {
+                \"/api/courses\",
+                \"/api/users\",
+                \"/api/auth\",
+                \"/api/ai\",
+                \"/api/analytics\",
+                \"/api/videos\"
+            };
+            
+            return significantPaths.Any(p => path.StartsWith(p));
+        }
+        
+        private string GetUserIdFromContext(HttpContext context)
+        {
+            return context.User?.Identity?.Name ?? \"anonymous\";
+        }
+        
+        private string GetClientIpAddress(HttpContext context)
+        {
+            return context.Connection.RemoteIpAddress?.ToString() ?? \"unknown\";
+        }
+    }
+}
+EOF" \
+    "Create analytics middleware" \
+    "CSHARP"
+
+# Crea controller per analytics dashboard
+execute_monitored_command \
+    "cat > src/InsightLearn.Analytics/Controllers/AnalyticsController.cs << 'EOF'
+using InsightLearn.Analytics.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace InsightLearn.Analytics.Controllers
+{
+    [ApiController]
+    [Route(\"api/[controller]\")]
+    [Authorize(Roles = \"Admin\")]
+    public class AnalyticsController : ControllerBase
+    {
+        private readonly BusinessAnalyticsService _analyticsService;
+        private readonly ILogger<AnalyticsController> _logger;
+        
+        public AnalyticsController(BusinessAnalyticsService analyticsService, ILogger<AnalyticsController> logger)
+        {
+            _analyticsService = analyticsService;
+            _logger = logger;
+        }
+        
+        [HttpGet(\"business-metrics\")]
+        public async Task<ActionResult> GetBusinessMetrics(
+            [FromQuery] DateTime? fromDate = null,
+            [FromQuery] DateTime? toDate = null)
+        {
+            try
+            {
+                var from = fromDate ?? DateTime.UtcNow.AddDays(-30);
+                var to = toDate ?? DateTime.UtcNow;
+                
+                var metrics = await _analyticsService.GetBusinessMetrics(from, to);
+                
+                return Ok(new
+                {
+                    Success = true,
+                    Data = metrics,
+                    Period = new { From = from, To = to }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, \"Failed to get business metrics\");
+                return StatusCode(500, new { Success = false, Error = \"Failed to retrieve metrics\" });
+            }
+        }
+        
+        [HttpPost(\"track/custom\")]
+        public async Task<ActionResult> TrackCustomEvent([FromBody] CustomEventRequest request)
+        {
+            try
+            {
+                // Implementa tracking di eventi personalizzati
+                var metadata = new Dictionary<string, object>
+                {
+                    [\"eventType\"] = request.EventType,
+                    [\"properties\"] = request.Properties,
+                    [\"source\"] = \"custom_api\"
+                };
+                
+                // Log per Prometheus
+                _logger.LogInformation(\"METRICS: custom_event_total{{type=\\\"{EventType}\\\"}} 1\", request.EventType);
+                
+                return Ok(new { Success = true, Message = \"Event tracked successfully\" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, \"Failed to track custom event\");
+                return StatusCode(500, new { Success = false, Error = \"Failed to track event\" });
+            }
+        }
+        
+        [HttpGet(\"health\")]
+        [AllowAnonymous]
+        public ActionResult GetHealthStatus()
+        {
+            return Ok(new
+            {
+                Status = \"healthy\",
+                Timestamp = DateTime.UtcNow,
+                Component = \"Analytics\",
+                Version = \"1.0.0\"
+            });
+        }
+    }
+    
+    public class CustomEventRequest
+    {
+        public string EventType { get; set; } = string.Empty;
+        public Dictionary<string, object> Properties { get; set; } = new();
+    }
+}
+EOF" \
+    "Create analytics API controller" \
+    "CSHARP"
+
+structured_log "SUCCESS" "STEP_9_5" "Business analytics setup completato"
+```
+
+### STEP 9.6: Deploy e Verifica Sistema Monitoring
+
+**Comando da eseguire dopo successo Step 9.5:**
+```bash
+#!/bin/bash
+# phase9_step6_deploy_monitoring.sh
+
+source scripts/monitoring/enhanced_executor.sh
+
+echo "=== [$(date)] FASE 9 STEP 6: Deploy Monitoring System ===" | tee -a "$BASE_LOG_DIR/phase9_step6.log"
+
+cd InsightLearn.Cloud
+
+# Deploy Prometheus
+execute_monitored_command \
+    "kubectl apply -f kubernetes/monitoring/prometheus-config.yaml" \
+    "Deploy Prometheus configuration" \
+    "PROMETHEUS"
+
+execute_monitored_command \
+    "kubectl apply -f kubernetes/monitoring/prometheus-rules.yaml" \
+    "Deploy Prometheus alert rules" \
+    "PROMETHEUS"
+
+execute_monitored_command \
+    "kubectl apply -f kubernetes/monitoring/prometheus-deployment.yaml" \
+    "Deploy Prometheus server" \
+    "PROMETHEUS"
+
+# Deploy Grafana
+execute_monitored_command \
+    "kubectl apply -f kubernetes/monitoring/grafana-config.yaml" \
+    "Deploy Grafana configuration" \
+    "GRAFANA"
+
+# Attendi che i pod siano pronti
+execute_monitored_command \
+    "kubectl wait --for=condition=ready pod -l app=prometheus -n insightlearn-monitoring --timeout=300s" \
+    "Wait for Prometheus pod ready" \
+    "PROMETHEUS"
+
+# Crea port-forward per accesso locale ai servizi di monitoring
+execute_monitored_command \
+    "cat > scripts/monitoring/port-forward.sh << 'EOF'
+#!/bin/bash
+# Script per accedere ai servizi di monitoring
+
+echo \"🚀 Avvio port-forward per servizi di monitoring...\"
+
+# Prometheus
+kubectl port-forward -n insightlearn-monitoring svc/prometheus 9090:9090 &
+PROMETHEUS_PID=\$!
+
+# Grafana (se presente)
+kubectl port-forward -n insightlearn-monitoring svc/grafana 3000:3000 &
+GRAFANA_PID=\$!
+
+echo \"✅ Port-forward attivi:\"
+echo \"📊 Prometheus: http://localhost:9090\"
+echo \"📈 Grafana: http://localhost:3000\"
+echo \"\"
+echo \"Per fermare i port-forward:\"
+echo \"kill \$PROMETHEUS_PID \$GRAFANA_PID\"
+
+# Mantieni attivo
+wait
+EOF" \
+    "Create port-forward script for monitoring services" \
+    "SCRIPT"
+
+execute_monitored_command \
+    "chmod +x scripts/monitoring/port-forward.sh" \
+    "Make port-forward script executable" \
+    "PERMISSIONS"
+
+# Verifica deployment monitoring
+execute_monitored_command \
+    "kubectl get pods -n insightlearn-monitoring" \
+    "Verify monitoring pods status" \
+    "VERIFICATION"
+
+execute_monitored_command \
+    "kubectl get services -n insightlearn-monitoring" \
+    "Verify monitoring services" \
+    "VERIFICATION"
+
+# Genera report finale
+execute_monitored_command \
+    "generate_analytics_report" \
+    "Generate analytics report" \
+    "ANALYTICS"
+
+# Test del sistema di health check
+execute_monitored_command \
+    "system_health_check" \
+    "Execute system health check" \
+    "HEALTH_CHECK"
+
+structured_log "SUCCESS" "STEP_9_6" "Deploy monitoring system completato"
+```
+
+## 📊 VERIFICA FINALE FASE 9
+
+```bash
+#!/bin/bash
+# phase9_verification.sh
+
+source scripts/monitoring/enhanced_executor.sh
+
+echo "========================================" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+echo "FASE 9: VERIFICA MONITORING & ANALYTICS" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+echo "Data: $(date)" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+echo "========================================" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+
+cd InsightLearn.Cloud
+
+ERRORS=0
+WARNINGS=0
+
+# Test Prometheus
+if execute_monitored_command "kubectl get pods -n insightlearn-monitoring -l app=prometheus --no-headers | grep Running" "Check Prometheus pod" "PROMETHEUS"; then
+    echo "✅ Prometheus: Running" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+else
+    echo "❌ Prometheus: Not running" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    ((ERRORS++))
+fi
+
+# Test Analytics Scripts
+if [ -f "scripts/monitoring/command_analytics.sh" ] && [ -x "scripts/monitoring/command_analytics.sh" ]; then
+    echo "✅ Analytics Scripts: Ready" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+else
+    echo "❌ Analytics Scripts: Missing or not executable" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    ((ERRORS++))
+fi
+
+# Test Command Executor
+if [ -f "scripts/monitoring/enhanced_executor.sh" ] && [ -x "scripts/monitoring/enhanced_executor.sh" ]; then
+    echo "✅ Enhanced Executor: Ready" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+else
+    echo "❌ Enhanced Executor: Missing" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    ((ERRORS++))
+fi
+
+# Test Business Analytics Service
+if [ -f "src/InsightLearn.Analytics/Services/BusinessAnalyticsService.cs" ]; then
+    echo "✅ Business Analytics: Service Created" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+else
+    echo "❌ Business Analytics: Service Missing" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    ((ERRORS++))
+fi
+
+echo "" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+echo "=== STATISTICHE FINALI ===" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+echo "Errori: $ERRORS" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+echo "Warning: $WARNINGS" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+
+if [ $ERRORS -eq 0 ]; then
+    echo "" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "✅ FASE 9 COMPLETATA CON SUCCESSO!" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "### PROSSIMI PASSI:" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "1. Avvia monitoring: ./scripts/monitoring/port-forward.sh" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "2. Accedi a Prometheus: http://localhost:9090" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "3. Genera analytics report: ./scripts/monitoring/command_analytics.sh" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "4. Procedi con Fase 10: CI/CD e Production Deploy" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    
+    exit 0
+else
+    echo "" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "❌ FASE 9 RICHIEDE CORREZIONI ($ERRORS errori)" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "### AZIONI NECESSARIE:" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "1. Controllare logs dettagliati in $BASE_LOG_DIR/" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "2. Correggere errori identificati" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "3. Rieseguire step falliti" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    echo "4. Verificare deployment Kubernetes" | tee -a "$BASE_LOG_DIR/phase9_verification.log"
+    
+    exit 1
+fi
+```
+
+## 🔧 Script Utili per Gestione Monitoring
+
+### Script di Manutenzione Sistema
+
+```bash
+#!/bin/bash
+# scripts/monitoring/maintenance.sh
+
+source scripts/monitoring/enhanced_executor.sh
+
+echo "=== InsightLearn.Cloud Maintenance Script ==="
+
+# Funzione per cleanup logs vecchi
+cleanup_old_logs() {
+    execute_monitored_command \
+        "find logs/ -name '*.log' -type f -mtime +7 -delete" \
+        "Clean logs older than 7 days" \
+        "MAINTENANCE"
+}
+
+# Funzione per backup configurazioni
+backup_configs() {
+    local backup_dir="backups/$(date +%Y%m%d_%H%M%S)"
+    
+    execute_monitored_command \
+        "mkdir -p $backup_dir" \
+        "Create backup directory" \
+        "BACKUP"
+    
+    execute_monitored_command \
+        "cp -r kubernetes/ $backup_dir/" \
+        "Backup Kubernetes manifests" \
+        "BACKUP"
+    
+    execute_monitored_command \
+        "cp -r scripts/ $backup_dir/" \
+        "Backup scripts" \
+        "BACKUP"
+    
+    echo "✅ Backup completato in: $backup_dir"
+}
+
+# Funzione per update sistema monitoring
+update_monitoring_images() {
+    execute_monitored_command \
+        "kubectl set image deployment/prometheus prometheus=prom/prometheus:latest -n insightlearn-monitoring" \
+        "Update Prometheus image" \
+        "UPDATE"
+        
+    execute_monitored_command \
+        "kubectl rollout status deployment/prometheus -n insightlearn-monitoring" \
+        "Wait for Prometheus rollout" \
+        "UPDATE"
+}
+
+# Menu principale
+case "${1:-menu}" in
+    "cleanup")
+        cleanup_old_logs
+        ;;
+    "backup")
+        backup_configs
+        ;;
+    "update")
+        update_monitoring_images
+        ;;
+    "health")
+        system_health_check
+        ;;
+    "analytics")
+        generate_analytics_report
+        ;;
+    *)
+        echo "Utilizzo: $0 [cleanup|backup|update|health|analytics]"
+        echo ""
+        echo "Opzioni:"
+        echo "  cleanup   - Rimuovi log vecchi (>7 giorni)"
+        echo "  backup    - Crea backup configurazioni"
+        echo "  update    - Aggiorna immagini monitoring"
+        echo "  health    - Esegui health check completo"
+        echo "  analytics - Genera report analytics"
+        ;;
+esac
+```
+
+### Dashboard Personalizzato per Command Execution
+
+```bash
+#!/bin/bash
+# scripts/monitoring/command_dashboard.sh
+
+source scripts/monitoring/enhanced_executor.sh
+
+# Dashboard in tempo reale per esecuzione comandi
+show_command_dashboard() {
+    clear
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║           InsightLearn.Cloud - Command Dashboard            ║"
+    echo "╠══════════════════════════════════════════════════════════════╣"
+    echo "║ Aggiornato: $(date)                              ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+    
+    # Statistiche comandi
+    if [ -f "logs/analytics/command_stats.json" ]; then
+        local total_commands=$(wc -l < "logs/analytics/command_stats.json")
+        local recent_commands=$(tail -n 100 "logs/analytics/command_stats.json" | wc -l)
+        local failed_recent=$(tail -n 100 "logs/analytics/command_stats.json" | jq -r 'select(.success == false)' | wc -l)
+        
+        echo "📊 STATISTICHE COMANDI (ultimi 100)"
+        echo "├─ Totali eseguiti: $total_commands"
+        echo "├─ Recenti (ultimi 100): $recent_commands"
+        echo "├─ Falliti recenti: $failed_recent"
+        echo "└─ Success rate: $(( (recent_commands - failed_recent) * 100 / recent_commands ))%"
+        echo ""
+    fi
+    
+    # Stato sistema
+    echo "🏥 STATO SISTEMA"
+    if kubectl cluster-info > /dev/null 2>&1; then
+        echo "├─ Kubernetes: ✅ Online"
+    else
+        echo "├─ Kubernetes: ❌ Offline"
+    fi
+    
+    if docker info > /dev/null 2>&1; then
+        echo "├─ Docker: ✅ Online"
+    else
+        echo "├─ Docker: ❌ Offline"
+    fi
+    
+    if kubectl get pods -n insightlearn-monitoring -l app=prometheus --no-headers | grep -q Running; then
+        echo "└─ Prometheus: ✅ Running"
+    else
+        echo "└─ Prometheus: ❌ Not Running"
+    fi
+    
+    echo ""
+    
+    # Ultimi comandi eseguiti
+    echo "📝 ULTIMI COMANDI ESEGUITI"
+    if [ -f "logs/analytics/execution_history.log" ]; then
+        tail -n 5 "logs/analytics/execution_history.log" | while read line; do
+            echo "├─ $line"
+        done
+    else
+        echo "└─ Nessun comando registrato"
+    fi
+    
+    echo ""
+    echo "🔄 Auto-refresh ogni 10 secondi (Ctrl+C per uscire)"
+}
+
+# Loop dashboard
+while true; do
+    show_command_dashboard
+    sleep 10
+done
+```
+
+## 📈 Metriche Custom per InsightLearn
+
+### Metriche Business Specifiche
+
+```yaml
+# kubernetes/monitoring/custom-metrics.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insightlearn-custom-metrics
+  namespace: insightlearn-monitoring
+data:
+  custom-rules.yml: |
+    groups:
+    - name: insightlearn.business
+      rules:
+      # Metriche di conversione
+      - record: insightlearn:conversion_rate_5m
+        expr: rate(insightlearn_course_enrollments_total[5m]) / rate(insightlearn_course_views_total[5m])
+      
+      # Metriche di engagement
+      - record: insightlearn:avg_video_completion_rate
+        expr: avg(insightlearn_video_watch_percentage) by (course_id)
+      
+      # Metriche AI performance
+      - record: insightlearn:ai_success_rate_5m
+        expr: rate(insightlearn_ai_requests_success_total[5m]) / rate(insightlearn_ai_requests_total[5m])
+      
+      # Revenue metrics
+      - record: insightlearn:revenue_per_hour
+        expr: rate(insightlearn_revenue_total[1h]) * 3600
+      
+    - name: insightlearn.sla
+      rules:
+      # SLA availability
+      - record: insightlearn:availability_5m
+        expr: 1 - (rate(insightlearn_requests_failed_total[5m]) / rate(insightlearn_requests_total[5m]))
+      
+      # Response time SLA
+      - record: insightlearn:response_time_sla_5m
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="insightlearn-web"}[5m])) < 2
+```
+
+## 📋 Checklist Finale Fase 9
+
+### ✅ Sistema Monitoring Implementato
+- [x] Prometheus deployment con configuration avanzata
+- [x] Grafana dashboards personalizzati per InsightLearn
+- [x] AlertManager con notifiche multi-canale
+- [x] Alert rules specifiche per business e infrastruttura
+- [x] Metriche custom per KPI business
+
+### ✅ Sistema Command Control
+- [x] Advanced command executor con retry automatico
+- [x] Structured logging per tutti i comandi bash
+- [x] Error detection e auto-recovery
+- [x] Analytics completo delle esecuzioni
+- [x] Health check system automatizzato
+
+### ✅ Business Analytics
+- [x] Business analytics service in C#
+- [x] Middleware per tracking automatico
+- [x] API endpoints per analytics dashboard
+- [x] Event tracking per user behavior
+- [x] Revenue e conversion tracking
+
+### ✅ Operational Tools
+- [x] Maintenance scripts automatizzati
+- [x] Port-forward scripts per accesso locale
+- [x] Command dashboard in tempo reale
+- [x] Backup e recovery procedures
+- [x] Log rotation e cleanup automatico
+
+### ✅ Integration Ready
+- [x] Kubernetes manifests completi
+- [x] Docker containers configurati
+- [x] Service discovery automatico
+- [x] Scalabilità orizzontale supportata
+- [x] CI/CD integration ready
+
+## 🎯 Risultato Finale Fase 9
+
+Al completamento di questa fase, avrete:
+
+**Sistema di Monitoring Enterprise-Grade** con Prometheus, Grafana e AlertManager completamente configurati per InsightLearn.Cloud, con dashboards personalizzati per metriche business e infrastrutturali.
+
+**Framework di Command Control Avanzato** che garantisce l'esecuzione affidabile di tutti i comandi bash con retry automatico, error detection, logging strutturato e analytics completo delle performance.
+
+**Business Intelligence Completo** con tracking automatico di user behavior, conversion rates, revenue metrics e AI performance, integrato direttamente nell'applicazione.
+
+**Operational Excellence** con strumenti automatizzati per maintenance, health checking, backup e monitoring in tempo reale dello stato del sistema.
+
+La Fase 9 rappresenta la base operativa che garantisce la stabilità, osservabilità e gestione proattiva della piattaforma InsightLearn.Cloud in produzione.

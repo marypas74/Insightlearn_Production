@@ -1,0 +1,273 @@
+@using InsightLearn.Web.Services
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
+
+@if (isLoading)
+{
+    <div class="auth-guard-loading">
+        <div class="spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+        </div>
+        <p>Checking authentication...</p>
+    </div>
+}
+else if (isAuthenticated)
+{
+    @if (hasRequiredPermission)
+    {
+        @ChildContent
+    }
+    else
+    {
+        <div class="auth-guard-forbidden">
+            <div class="forbidden-content">
+                <i class="fas fa-lock"></i>
+                <h2>Access Denied</h2>
+                <p>You don't have permission to access this page.</p>
+                <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo(&quot;/dashboard&quot;)">
+                    Go to Dashboard
+                </button>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <div class="auth-guard-login">
+        <div class="login-prompt">
+            <i class="fas fa-user-lock"></i>
+            <h2>Authentication Required</h2>
+            <p>Please sign in to access this page.</p>
+            <div class="auth-actions">
+                <button class="btn btn-primary" @onclick="() => Navigation.NavigateTo(&quot;/login&quot;)">
+                    Sign In
+                </button>
+                <button class="btn btn-secondary" @onclick="() => Navigation.NavigateTo(&quot;/register&quot;)">
+                    Create Account
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string[]? RequiredRoles { get; set; }
+    [Parameter] public string[]? RequiredPermissions { get; set; }
+    [Parameter] public bool RequireEmailVerification { get; set; } = false;
+
+    private bool isLoading = true;
+    private bool isAuthenticated = false;
+    private bool hasRequiredPermission = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthState.OnAuthStateChanged += OnAuthStateChanged;
+        await CheckAuthState();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthState.InitializeAsync();
+        }
+    }
+
+    private async Task OnAuthStateChanged()
+    {
+        await CheckAuthState();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CheckAuthState()
+    {
+        isLoading = true;
+
+        try
+        {
+            isAuthenticated = await AuthState.IsAuthenticatedAsync();
+
+            if (isAuthenticated)
+            {
+                hasRequiredPermission = await CheckPermissions();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking auth state: {ex.Message}");
+            isAuthenticated = false;
+            hasRequiredPermission = false;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<bool> CheckPermissions()
+    {
+        try
+        {
+            var user = await AuthState.GetCurrentUserAsync();
+            if (user == null)
+                return false;
+
+            // Check email verification if required
+            if (RequireEmailVerification && !user.EmailVerified)
+            {
+                return false;
+            }
+
+            // Check required roles
+            if (RequiredRoles != null && RequiredRoles.Length > 0)
+            {
+                var hasRole = RequiredRoles.Any(role =>
+                    user.Roles.Contains(role, StringComparer.OrdinalIgnoreCase));
+
+                if (!hasRole)
+                    return false;
+            }
+
+            // Check required permissions
+            if (RequiredPermissions != null && RequiredPermissions.Length > 0)
+            {
+                var hasPermission = RequiredPermissions.Any(permission =>
+                    user.Permissions.Contains(permission));
+
+                if (!hasPermission)
+                    return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking permissions: {ex.Message}");
+            return false;
+        }
+    }
+
+    public void Dispose()
+    {
+        AuthState.OnAuthStateChanged -= OnAuthStateChanged;
+    }
+}
+
+<style>
+    .auth-guard-loading,
+    .auth-guard-login,
+    .auth-guard-forbidden {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        padding: 40px 20px;
+    }
+
+    .auth-guard-loading {
+        flex-direction: column;
+        gap: 20px;
+        color: #6b7280;
+    }
+
+    .spinner {
+        font-size: 2rem;
+        color: #667eea;
+    }
+
+    .login-prompt,
+    .forbidden-content {
+        text-align: center;
+        max-width: 400px;
+        padding: 40px;
+        background: #f8fafc;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .login-prompt i,
+    .forbidden-content i {
+        font-size: 4rem;
+        color: #667eea;
+        margin-bottom: 24px;
+    }
+
+    .forbidden-content i {
+        color: #dc2626;
+    }
+
+    .login-prompt h2,
+    .forbidden-content h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 12px;
+    }
+
+    .login-prompt p,
+    .forbidden-content p {
+        color: #6b7280;
+        margin-bottom: 32px;
+        line-height: 1.5;
+    }
+
+    .auth-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.875rem;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s ease-in-out;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 120px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        box-shadow: 0 4px 14px 0 rgba(102, 126, 234, 0.39);
+        transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+
+    .btn-secondary:hover {
+        background: #e2e8f0;
+        border-color: #cbd5e1;
+    }
+
+    @media (max-width: 640px) {
+        .auth-actions {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+        }
+
+        .login-prompt,
+        .forbidden-content {
+            padding: 32px 24px;
+            margin: 0 16px;
+        }
+    }
+</style>

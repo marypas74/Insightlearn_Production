@@ -1,0 +1,220 @@
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="il-input-container @ContainerClass">
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label class="il-input-label" for="@InputId">
+            @Label
+            @if (IsRequired)
+            {
+                <span class="il-required">*</span>
+            }
+        </label>
+    }
+
+    <div class="il-input-wrapper">
+        @if (!string.IsNullOrEmpty(IconLeft))
+        {
+            <i class="il-input-icon-left @IconLeft"></i>
+        }
+
+        <input id="@InputId"
+               type="@InputType"
+               class="@GetInputClasses()"
+               placeholder="@Placeholder"
+               value="@Value"
+               disabled="@IsDisabled"
+               readonly="@IsReadOnly"
+               @oninput="OnValueChanged"
+               @onfocus="OnFocus"
+               @onblur="OnBlur" />
+
+        @if (!string.IsNullOrEmpty(IconRight))
+        {
+            <i class="il-input-icon-right @IconRight"></i>
+        }
+
+        @if (ShowClearButton && !string.IsNullOrEmpty(Value))
+        {
+            <button type="button" class="il-input-clear" @onclick="ClearValue">
+                <i class="fas fa-times"></i>
+            </button>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(HelperText))
+    {
+        <div class="il-input-helper">@HelperText</div>
+    }
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="il-input-error">@ErrorMessage</div>
+    }
+</div>
+
+<style>
+.il-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--il-space-2);
+    width: 100%;
+}
+
+.il-input-label {
+    font-size: var(--il-text-sm);
+    font-weight: var(--il-font-medium);
+    color: var(--il-text-secondary);
+}
+
+.il-required {
+    color: var(--il-error);
+}
+
+.il-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.il-input-icon-left,
+.il-input-icon-right {
+    position: absolute;
+    color: var(--il-text-tertiary);
+    pointer-events: none;
+}
+
+.il-input-icon-left {
+    left: var(--il-space-3);
+}
+
+.il-input-icon-right {
+    right: var(--il-space-3);
+}
+
+.il-input-clear {
+    position: absolute;
+    right: var(--il-space-2);
+    background: none;
+    border: none;
+    color: var(--il-text-tertiary);
+    cursor: pointer;
+    padding: var(--il-space-1);
+    border-radius: var(--il-radius-base);
+    transition: all var(--il-duration-200) var(--il-ease-out);
+}
+
+.il-input-clear:hover {
+    color: var(--il-text-secondary);
+    background: var(--il-bg-secondary);
+}
+
+.il-input-helper {
+    font-size: var(--il-text-xs);
+    color: var(--il-text-tertiary);
+}
+
+.il-input-error {
+    font-size: var(--il-text-xs);
+    color: var(--il-error);
+    font-weight: var(--il-font-medium);
+}
+
+.il-input-glass {
+    background: var(--il-glass-bg);
+    backdrop-filter: var(--il-backdrop-blur);
+    border-color: var(--il-glass-border);
+}
+
+.il-input-neuro {
+    background: var(--il-bg-secondary);
+    border: none;
+    box-shadow: var(--il-neuro-inset);
+}
+
+.il-input-has-icon-left {
+    padding-left: var(--il-space-10);
+}
+
+.il-input-has-icon-right {
+    padding-right: var(--il-space-10);
+}
+
+.il-input-error-state {
+    border-color: var(--il-error);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.il-input-success-state {
+    border-color: var(--il-success);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+</style>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string InputType { get; set; } = "text";
+    [Parameter] public bool IsRequired { get; set; }
+    [Parameter] public bool IsDisabled { get; set; }
+    [Parameter] public bool IsReadOnly { get; set; }
+    [Parameter] public string? IconLeft { get; set; }
+    [Parameter] public string? IconRight { get; set; }
+    [Parameter] public bool ShowClearButton { get; set; }
+    [Parameter] public string? HelperText { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public InputVariant Variant { get; set; } = InputVariant.Default;
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public string? ContainerClass { get; set; }
+    [Parameter] public EventCallback<FocusEventArgs> OnFocus { get; set; }
+    [Parameter] public EventCallback<FocusEventArgs> OnBlur { get; set; }
+
+    private string InputId = Guid.NewGuid().ToString("N")[..8];
+
+    private string GetInputClasses()
+    {
+        var classes = new List<string> { "il-input" };
+
+        classes.Add(Variant switch
+        {
+            InputVariant.Glass => "il-input-glass",
+            InputVariant.Neuro => "il-input-neuro",
+            _ => ""
+        });
+
+        if (!string.IsNullOrEmpty(IconLeft))
+            classes.Add("il-input-has-icon-left");
+
+        if (!string.IsNullOrEmpty(IconRight) || ShowClearButton)
+            classes.Add("il-input-has-icon-right");
+
+        if (!string.IsNullOrEmpty(ErrorMessage))
+            classes.Add("il-input-error-state");
+
+        if (!string.IsNullOrEmpty(CssClass))
+            classes.Add(CssClass);
+
+        return string.Join(" ", classes.Where(c => !string.IsNullOrEmpty(c)));
+    }
+
+    private async Task OnValueChanged(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString() ?? "";
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private async Task ClearValue()
+    {
+        Value = "";
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    public enum InputVariant
+    {
+        Default,
+        Glass,
+        Neuro
+    }
+}

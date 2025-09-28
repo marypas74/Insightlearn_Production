@@ -1,0 +1,85 @@
+{
+  "Files": [
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/obj/Release/net8.0/scopedcss/projectbundle/InsightLearn.Web.bundle.scp.css",
+      "PackagePath": "staticwebassets/InsightLearn.Web.bundle.scp.css"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/app.css",
+      "PackagePath": "staticwebassets/app.css"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/bootstrap/bootstrap.min.css",
+      "PackagePath": "staticwebassets/bootstrap/bootstrap.min.css"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/bootstrap/bootstrap.min.css.map",
+      "PackagePath": "staticwebassets/bootstrap/bootstrap.min.css.map"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/css/design-system/components.css",
+      "PackagePath": "staticwebassets/css/design-system/components.css"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/css/design-system/design-tokens.css",
+      "PackagePath": "staticwebassets/css/design-system/design-tokens.css"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/favicon.png",
+      "PackagePath": "staticwebassets/favicon.png"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/icon-144.png",
+      "PackagePath": "staticwebassets/icon-144.png"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/icon-192.png",
+      "PackagePath": "staticwebassets/icon-192.png"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/icon-48.png",
+      "PackagePath": "staticwebassets/icon-48.png"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/icon-512.png",
+      "PackagePath": "staticwebassets/icon-512.png"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/icon-72.png",
+      "PackagePath": "staticwebassets/icon-72.png"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/icon-96.png",
+      "PackagePath": "staticwebassets/icon-96.png"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/js/design-system/theme-manager.js",
+      "PackagePath": "staticwebassets/js/design-system/theme-manager.js"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/manifest.json",
+      "PackagePath": "staticwebassets/manifest.json"
+    },
+    {
+      "Id": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/wwwroot/sw.js",
+      "PackagePath": "staticwebassets/sw.js"
+    },
+    {
+      "Id": "obj/Release/net8.0/staticwebassets/msbuild.InsightLearn.Web.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj/Release/net8.0/staticwebassets/msbuild.build.InsightLearn.Web.props",
+      "PackagePath": "build\\InsightLearn.Web.props"
+    },
+    {
+      "Id": "obj/Release/net8.0/staticwebassets/msbuild.buildMultiTargeting.InsightLearn.Web.props",
+      "PackagePath": "buildMultiTargeting\\InsightLearn.Web.props"
+    },
+    {
+      "Id": "obj/Release/net8.0/staticwebassets/msbuild.buildTransitive.InsightLearn.Web.props",
+      "PackagePath": "buildTransitive\\InsightLearn.Web.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

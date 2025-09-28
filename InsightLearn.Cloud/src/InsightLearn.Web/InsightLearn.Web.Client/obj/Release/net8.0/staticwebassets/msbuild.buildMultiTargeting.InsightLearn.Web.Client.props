@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="../build/InsightLearn.Web.Client.props" />
+</Project>

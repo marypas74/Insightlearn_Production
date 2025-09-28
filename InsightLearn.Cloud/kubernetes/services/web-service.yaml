@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightlearn-web-service
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: web
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: insightlearn
+    component: web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightlearn-api-service
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: insightlearn
+    component: api

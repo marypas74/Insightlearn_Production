@@ -1,0 +1,183 @@
+---
+# Analytics Service per InsightLearn
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-analytics
+  namespace: insightlearn
+  labels:
+    app: insightlearn-analytics
+    tier: analytics
+    component: insightlearn
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: insightlearn-analytics
+  template:
+    metadata:
+      labels:
+        app: insightlearn-analytics
+        tier: analytics
+        component: insightlearn
+    spec:
+      containers:
+      - name: analytics
+        image: busybox
+        command: ['sh', '-c', 'while true; do echo "📊 Analizzando dati utenti InsightLearn - Corsi: 8, Studenti: 7, Sessioni attive: $((RANDOM % 50 + 10))"; sleep 30; done']
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightlearn-analytics-service
+  namespace: insightlearn
+  labels:
+    app: insightlearn-analytics
+spec:
+  selector:
+    app: insightlearn-analytics
+  ports:
+  - port: 8080
+    targetPort: 8080
+---
+# Servizio di Notifiche per InsightLearn
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-notifications
+  namespace: insightlearn
+  labels:
+    app: insightlearn-notifications
+    tier: services
+    component: insightlearn
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insightlearn-notifications
+  template:
+    metadata:
+      labels:
+        app: insightlearn-notifications
+        tier: services
+        component: insightlearn
+    spec:
+      containers:
+      - name: notifications
+        image: busybox
+        command: ['sh', '-c', 'while true; do echo "📧 Invio notifiche: Nuovo corso disponibile, Promemoria lezioni, Certificati pronti"; sleep 45; done']
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+---
+# Job di Backup Database InsightLearn
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: insightlearn-db-backup
+  namespace: insightlearn
+  labels:
+    component: insightlearn
+    type: maintenance
+spec:
+  schedule: "0 2 * * *"  # Ogni giorno alle 2:00
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: postgres:13
+            env:
+            - name: PGPASSWORD
+              value: "insightlearn123"
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "🔄 Backup database InsightLearn avviato..."
+              echo "📊 Statistiche backup:"
+              echo "   - Corsi salvati: 8"
+              echo "   - Utenti salvati: 7"
+              echo "   - Iscrizioni salvate: 7"
+              echo "   - Backup completato in $(date)"
+          restartPolicy: OnFailure
+---
+# ConfigMap con dati InsightLearn
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insightlearn-course-catalog
+  namespace: insightlearn
+  labels:
+    component: insightlearn
+    type: catalog
+data:
+  courses.json: |
+    {
+      "totalCourses": 8,
+      "categories": [
+        "Programmazione",
+        "Data Science",
+        "Web Development",
+        "DevOps",
+        "Security",
+        "Database",
+        "Design",
+        "Blockchain"
+      ],
+      "featuredCourses": [
+        {
+          "id": 1,
+          "title": "Introduzione a Python",
+          "instructor": "Prof. Marco Rossi",
+          "students": 156,
+          "rating": 4.8
+        },
+        {
+          "id": 3,
+          "title": "Sviluppo Web con React",
+          "instructor": "Ing. Luigi Verdi",
+          "students": 203,
+          "rating": 4.9
+        }
+      ]
+    }
+  statistics.json: |
+    {
+      "platform": "InsightLearn",
+      "totalStudents": 7,
+      "totalInstructors": 2,
+      "totalCourses": 8,
+      "totalEnrollments": 7,
+      "activeUsers": 5,
+      "completionRate": 28.6,
+      "lastUpdated": "2025-09-28T14:15:00Z"
+    }
+---
+# Secret per le credenziali InsightLearn
+apiVersion: v1
+kind: Secret
+metadata:
+  name: insightlearn-credentials
+  namespace: insightlearn
+  labels:
+    component: insightlearn
+    type: auth
+type: Opaque
+data:
+  # Dati codificati in base64 (esempio)
+  admin-user: YWRtaW4=  # admin
+  admin-pass: aW5zaWdodGxlYXJuMTIz  # insightlearn123
+  api-key: aWwtYXBpLWtleS0yMDI1  # il-api-key-2025

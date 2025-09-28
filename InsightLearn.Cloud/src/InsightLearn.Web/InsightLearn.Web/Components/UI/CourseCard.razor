@@ -1,0 +1,62 @@
+@namespace InsightLearn.Web.Components.UI
+
+<div class="udemy-course-card" style="border: 1px solid var(--neutral-200); border-radius: 8px; overflow: hidden; background: white; transition: all 0.2s ease; margin-bottom: 16px;">
+    <div style="aspect-ratio: 16/9; overflow: hidden; position: relative;">
+        <img src="@ImageUrl" alt="@Title" style="width: 100%; height: 100%; object-fit: cover;" />
+        <div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+            @Duration
+        </div>
+    </div>
+
+    <div style="padding: 16px;">
+        <h3 style="font-size: 16px; font-weight: 700; color: var(--neutral-900); margin-bottom: 8px; line-height: 1.4;">
+            @Title
+        </h3>
+
+        <p style="font-size: 12px; color: var(--neutral-600); margin-bottom: 4px;">
+            @Instructor
+        </p>
+
+        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 14px; font-weight: 700; color: #b4690e; margin-right: 4px;">@Rating.ToString("F1")</span>
+            <div style="display: flex; margin-right: 8px;">
+                @for (int i = 1; i <= 5; i++)
+                {
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="@(i <= Rating ? "#b4690e" : "#e5e5e5")" style="margin-right: 2px;">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                }
+            </div>
+            <span style="font-size: 12px; color: var(--neutral-600);">(@StudentsCount.ToString("N0"))</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span style="font-size: 16px; font-weight: 700; color: var(--neutral-900);">@Price</span>
+                @if (!string.IsNullOrEmpty(OriginalPrice))
+                {
+                    <span style="font-size: 14px; color: var(--neutral-600); text-decoration: line-through; margin-left: 8px;">@OriginalPrice</span>
+                }
+            </div>
+            @if (IsBestseller)
+            {
+                <span style="background: #eceb98; color: #3d3c0a; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                    Bestseller
+                </span>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string ImageUrl { get; set; } = "";
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Instructor { get; set; } = "";
+    [Parameter] public double Rating { get; set; }
+    [Parameter] public int StudentsCount { get; set; }
+    [Parameter] public string Price { get; set; } = "";
+    [Parameter] public string OriginalPrice { get; set; } = "";
+    [Parameter] public string Duration { get; set; } = "";
+    [Parameter] public bool IsBestseller { get; set; }
+    [Parameter] public string CourseId { get; set; } = "";
+}

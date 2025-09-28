@@ -1,0 +1,535 @@
+@page "/course/{courseId}"
+@using InsightLearn.Web.Components.UI
+
+<PageTitle>@(courseData?.Title ?? "Course") | InsightLearn</PageTitle>
+
+@if (courseData != null)
+{
+    <!-- Udemy-style Course Hero Section -->
+    <section style="background: var(--neutral-900); color: #fff; padding: 32px 0;">
+        <div class="udemy-container">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 48px; align-items: start;">
+                <!-- Course Info -->
+                <div>
+                    <!-- Breadcrumb -->
+                    <div style="font-size: 14px; color: var(--udemy-purple); margin-bottom: 16px;">
+                        <a href="/" style="color: var(--udemy-purple); text-decoration: none;">Home</a>
+                        <span style="color: var(--neutral-400);"> > </span>
+                        <a href="/courses/@courseData.Category" style="color: var(--udemy-purple); text-decoration: none;">
+                            @GetCategoryDisplayName(courseData.Category)
+                        </a>
+                        <span style="color: var(--neutral-400);"> > </span>
+                        <span style="color: var(--neutral-400);">@courseData.Title</span>
+                    </div>
+
+                    <h1 style="font-size: 32px; font-weight: 700; line-height: 1.2; margin-bottom: 16px; color: #fff;">
+                        @courseData.Title
+                    </h1>
+
+                    <p style="font-size: 19px; line-height: 1.4; margin-bottom: 16px; color: var(--neutral-300);">
+                        @courseData.Description
+                    </p>
+
+                    <!-- Rating and Stats -->
+                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="color: var(--secondary-400); font-weight: 700;">@courseData.Rating.ToString("0.0")</span>
+                            <span style="color: var(--secondary-400);">★★★★☆</span>
+                            <span style="color: var(--udemy-purple);">(@courseData.ReviewCount.ToString("N0") ratings)</span>
+                        </div>
+                        <span style="color: var(--neutral-400);">@courseData.StudentCount.ToString("N0") students</span>
+                    </div>
+
+                    <!-- Instructor -->
+                    <div style="margin-bottom: 16px;">
+                        <span style="color: var(--neutral-400);">Created by </span>
+                        <a href="/instructor/@courseData.InstructorId" style="color: var(--udemy-purple); text-decoration: underline;">
+                            @courseData.Instructor
+                        </a>
+                    </div>
+
+                    <!-- Course Meta -->
+                    <div style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap; font-size: 14px;">
+                        <div style="display: flex; align-items: center; gap: 4px; color: var(--neutral-400);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12,6 12,12 16,14"></polyline>
+                            </svg>
+                            <span>@courseData.Duration hours on-demand video</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px; color: var(--neutral-400);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14,2 14,8 20,8"></polyline>
+                            </svg>
+                            <span>@courseData.ArticleCount articles</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px; color: var(--neutral-400);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            </svg>
+                            <span>Full lifetime access</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px; color: var(--neutral-400);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                <path d="M10 4v4"></path>
+                                <path d="M14 4v4"></path>
+                            </svg>
+                            <span>Access on mobile and TV</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Course Preview Card (Sticky) -->
+                <div style="position: sticky; top: 90px;">
+                    <div style="background: #fff; border-radius: 4px; padding: 0; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.08);">
+                        <!-- Video Preview -->
+                        <div style="position: relative;">
+                            <img src="@courseData.ImageUrl" alt="@courseData.Title"
+                                 style="width: 100%; height: 200px; object-fit: cover;" />
+                            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3);">
+                                <div style="background: rgba(0,0,0,0.8); border-radius: 50%; padding: 16px; cursor: pointer;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
+                                        <polygon points="5,3 19,12 5,21"></polygon>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="padding: 24px;">
+                            <!-- Pricing -->
+                            <div style="margin-bottom: 16px;">
+                                @if (courseData.Price > 0)
+                                {
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                        <span style="font-size: 32px; font-weight: 700; color: var(--neutral-900);">
+                                            $@courseData.Price.ToString("F2")
+                                        </span>
+                                        @if (courseData.OriginalPrice > courseData.Price)
+                                        {
+                                            <span style="font-size: 16px; text-decoration: line-through; color: var(--neutral-500);">
+                                                $@courseData.OriginalPrice.ToString("F2")
+                                            </span>
+                                        }
+                                    </div>
+                                    @if (courseData.OriginalPrice > courseData.Price)
+                                    {
+                                        var discount = Math.Round((courseData.OriginalPrice - courseData.Price) / courseData.OriginalPrice * 100);
+                                        <div style="color: var(--error); font-weight: 700; font-size: 16px; margin-bottom: 8px;">
+                                            @discount% off
+                                        </div>
+                                    }
+                                    <div style="color: var(--error); font-size: 16px; font-weight: 700; margin-bottom: 16px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <polyline points="12,6 12,12 16,14"></polyline>
+                                        </svg>
+                                        2 days left at this price!
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div style="font-size: 32px; font-weight: 700; color: var(--secondary-600); margin-bottom: 16px;">
+                                        Free
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div style="display: flex; flex-direction: column; gap: 12px;">
+                                <button class="udemy-btn udemy-btn-primary" style="width: 100%; padding: 16px; font-size: 16px; font-weight: 700;">
+                                    Add to cart
+                                </button>
+                                <button class="udemy-btn udemy-btn-outline" style="width: 100%; padding: 16px; font-size: 16px;">
+                                    Buy now
+                                </button>
+                            </div>
+
+                            <!-- Money Back Guarantee -->
+                            <div style="text-align: center; margin-top: 16px; font-size: 14px; color: var(--neutral-600);">
+                                30-Day Money-Back Guarantee
+                            </div>
+
+                            <!-- Course Includes -->
+                            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--neutral-200);">
+                                <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--neutral-900);">
+                                    This course includes:
+                                </h4>
+                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: var(--neutral-700);">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                                        </svg>
+                                        <span>@courseData.Duration hours on-demand video</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                            <polyline points="14,2 14,8 20,8"></polyline>
+                                        </svg>
+                                        <span>@courseData.ArticleCount articles</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                            <path d="M10 4v4"></path>
+                                            <path d="M14 4v4"></path>
+                                        </svg>
+                                        <span>Access on mobile and TV</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                        </svg>
+                                        <span>Full lifetime access</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M9 12l2 2 4-4"></path>
+                                            <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"></path>
+                                            <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"></path>
+                                        </svg>
+                                        <span>Certificate of completion</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Share and Wishlist -->
+                            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--neutral-200); display: flex; justify-content: space-between;">
+                                <button style="background: none; border: none; color: var(--neutral-600); font-size: 14px; cursor: pointer; text-decoration: underline;">
+                                    Share
+                                </button>
+                                <button style="background: none; border: none; color: var(--neutral-600); font-size: 14px; cursor: pointer; text-decoration: underline;">
+                                    Gift this course
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Course Content Tabs -->
+    <section style="background: #fff; border-bottom: 1px solid var(--neutral-200);">
+        <div class="udemy-container">
+            <div style="display: flex; gap: 32px; padding: 16px 0;">
+                <button class="@(activeTab == "overview" ? "active" : "")"
+                        @onclick="() => SetActiveTab(&quot;overview&quot;)"
+                        style="background: none; border: none; padding: 8px 0; font-weight: 700; color: @(activeTab == "overview" ? "var(--neutral-900)" : "var(--neutral-600)"); border-bottom: 2px solid @(activeTab == "overview" ? "var(--neutral-900)" : "transparent"); cursor: pointer;">
+                    Overview
+                </button>
+                <button class="@(activeTab == "curriculum" ? "active" : "")"
+                        @onclick="() => SetActiveTab(&quot;curriculum&quot;)"
+                        style="background: none; border: none; padding: 8px 0; font-weight: 700; color: @(activeTab == "curriculum" ? "var(--neutral-900)" : "var(--neutral-600)"); border-bottom: 2px solid @(activeTab == "curriculum" ? "var(--neutral-900)" : "transparent"); cursor: pointer;">
+                    Curriculum
+                </button>
+                <button class="@(activeTab == "instructor" ? "active" : "")"
+                        @onclick="() => SetActiveTab(&quot;instructor&quot;)"
+                        style="background: none; border: none; padding: 8px 0; font-weight: 700; color: @(activeTab == "instructor" ? "var(--neutral-900)" : "var(--neutral-600)"); border-bottom: 2px solid @(activeTab == "instructor" ? "var(--neutral-900)" : "transparent"); cursor: pointer;">
+                    Instructor
+                </button>
+                <button class="@(activeTab == "reviews" ? "active" : "")"
+                        @onclick="() => SetActiveTab(&quot;reviews&quot;)"
+                        style="background: none; border: none; padding: 8px 0; font-weight: 700; color: @(activeTab == "reviews" ? "var(--neutral-900)" : "var(--neutral-600)"); border-bottom: 2px solid @(activeTab == "reviews" ? "var(--neutral-900)" : "transparent"); cursor: pointer;">
+                    Reviews
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tab Content -->
+    <section style="background: var(--neutral-50); padding: 32px 0;">
+        <div class="udemy-container">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 48px;">
+                <div>
+                    @if (activeTab == "overview")
+                    {
+                        <!-- What You'll Learn -->
+                        <div style="background: #fff; border-radius: 4px; padding: 24px; margin-bottom: 24px; border: 1px solid var(--neutral-200);">
+                            <h3 style="font-size: 24px; font-weight: 700; margin-bottom: 16px; color: var(--neutral-900);">
+                                What you'll learn
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                @foreach (var item in courseData.LearningObjectives)
+                                {
+                                    <div style="display: flex; align-items: flex-start; gap: 8px; font-size: 14px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-top: 2px; color: var(--neutral-600);">
+                                            <polyline points="20,6 9,17 4,12"></polyline>
+                                        </svg>
+                                        <span>@item</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Course Description -->
+                        <div style="background: #fff; border-radius: 4px; padding: 24px; margin-bottom: 24px; border: 1px solid var(--neutral-200);">
+                            <h3 style="font-size: 24px; font-weight: 700; margin-bottom: 16px; color: var(--neutral-900);">
+                                Course content
+                            </h3>
+                            <div style="line-height: 1.6; color: var(--neutral-700);">
+                                @((MarkupString)courseData.FullDescription)
+                            </div>
+                        </div>
+
+                        <!-- Requirements -->
+                        <div style="background: #fff; border-radius: 4px; padding: 24px; margin-bottom: 24px; border: 1px solid var(--neutral-200);">
+                            <h3 style="font-size: 24px; font-weight: 700; margin-bottom: 16px; color: var(--neutral-900);">
+                                Requirements
+                            </h3>
+                            <ul style="list-style: disc; padding-left: 20px; line-height: 1.6; color: var(--neutral-700);">
+                                @foreach (var requirement in courseData.Requirements)
+                                {
+                                    <li style="margin-bottom: 4px;">@requirement</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                    else if (activeTab == "curriculum")
+                    {
+                        <!-- Course Curriculum -->
+                        <div style="background: #fff; border-radius: 4px; border: 1px solid var(--neutral-200);">
+                            <div style="padding: 24px; border-bottom: 1px solid var(--neutral-200);">
+                                <h3 style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: var(--neutral-900);">
+                                    Course content
+                                </h3>
+                                <p style="color: var(--neutral-600);">
+                                    @courseData.Sections.Count sections • @courseData.Sections.Sum(s => s.Lectures.Count) lectures • @courseData.Duration hours total length
+                                </p>
+                            </div>
+                            @foreach (var section in courseData.Sections)
+                            {
+                                <div style="border-bottom: 1px solid var(--neutral-200);">
+                                    <div style="padding: 16px 24px; background: var(--neutral-50); cursor: pointer;" @onclick="() => ToggleSection(section.Id)">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <h4 style="font-size: 16px; font-weight: 700; color: var(--neutral-900); margin-bottom: 4px;">
+                                                    @(section.Title)
+                                                </h4>
+                                                <p style="font-size: 14px; color: var(--neutral-600);">
+                                                    @(section.Lectures.Count) lectures • @(section.Duration) minutes
+                                                </p>
+                                            </div>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                                 style="transform: rotate(@(expandedSections.Contains(section.Id) ? "180deg" : "0deg")); transition: transform 0.2s ease;">
+                                                <polyline points="6,9 12,15 18,9"></polyline>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    @if (expandedSections.Contains(section.Id))
+                                    {
+                                        <div style="padding: 0 24px;">
+                                            @foreach (var lecture in section.Lectures)
+                                            {
+                                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--neutral-100);">
+                                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <polygon points="5,3 19,12 5,21"></polygon>
+                                                        </svg>
+                                                        <span style="font-size: 14px; color: var(--neutral-700);">@lecture.Title</span>
+                                                    </div>
+                                                    <span style="font-size: 14px; color: var(--neutral-600);">@lecture.Duration min</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <!-- Sidebar -->
+                <div>
+                    <!-- More Courses -->
+                    <div style="background: #fff; border-radius: 4px; padding: 24px; border: 1px solid var(--neutral-200);">
+                        <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--neutral-900);">
+                            More courses by @courseData.Instructor
+                        </h4>
+                        <!-- Course recommendations would go here -->
+                        <p style="color: var(--neutral-600); font-size: 14px;">
+                            Explore more courses from this instructor
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+}
+else
+{
+    <div class="udemy-container" style="padding: 48px 0; text-align: center;">
+        <h1 style="font-size: 24px; color: var(--neutral-600);">Course not found</h1>
+        <a href="/courses" class="udemy-btn udemy-btn-primary" style="margin-top: 16px; display: inline-block;">
+            Browse Courses
+        </a>
+    </div>
+}
+
+@code {
+    [Parameter] public string CourseId { get; set; } = string.Empty;
+
+    private CourseDetailData? courseData;
+    private string activeTab = "overview";
+    private HashSet<string> expandedSections = new();
+
+    protected override void OnInitialized()
+    {
+        LoadCourseData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        LoadCourseData();
+    }
+
+    private void LoadCourseData()
+    {
+        // In a real app, this would fetch from an API
+        courseData = GetSampleCourseData(CourseId);
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        activeTab = tab;
+        StateHasChanged();
+    }
+
+    private void ToggleSection(string sectionId)
+    {
+        if (expandedSections.Contains(sectionId))
+            expandedSections.Remove(sectionId);
+        else
+            expandedSections.Add(sectionId);
+        StateHasChanged();
+    }
+
+    private string GetCategoryDisplayName(string category)
+    {
+        return category.ToLowerInvariant() switch
+        {
+            "development" => "Development",
+            "business" => "Business",
+            "finance-accounting" => "Finance & Accounting",
+            "it-software" => "IT & Software",
+            "office-productivity" => "Office Productivity",
+            "personal-development" => "Personal Development",
+            "design" => "Design",
+            "marketing" => "Marketing",
+            "lifestyle" => "Lifestyle",
+            "photography" => "Photography & Video",
+            "health-fitness" => "Health & Fitness",
+            "music" => "Music",
+            "teaching" => "Teaching & Academics",
+            _ => category
+        };
+    }
+
+    private CourseDetailData? GetSampleCourseData(string courseId)
+    {
+        return courseId.ToLowerInvariant() switch
+        {
+            "python-bootcamp" => new CourseDetailData
+            {
+                Id = "python-bootcamp",
+                Title = "Complete Python Bootcamp From Zero to Hero in Python",
+                Description = "Learn Python like a Professional Start from the basics and go all the way to creating your own applications and games",
+                FullDescription = "<p>Welcome to the <strong>Complete Python Bootcamp From Zero to Hero in Python</strong>! This is the most comprehensive, yet straight-forward, course for the Python programming language on Udemy!</p><p>Whether you have never programmed before, already know basic syntax, or want to learn about the advanced features of Python, this course is for you! In this course we will teach you Python 3.</p>",
+                Instructor = "Dr. Jose Portilla",
+                InstructorId = "jose-portilla",
+                Rating = 4.6,
+                ReviewCount = 458839,
+                StudentCount = 1567892,
+                Price = 89.99m,
+                OriginalPrice = 199.99m,
+                Duration = 22.0,
+                ArticleCount = 19,
+                ImageUrl = "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=400&h=225&fit=crop",
+                Category = "development",
+                LearningObjectives = new List<string>
+                {
+                    "Learn to use Python professionally, learning both Python 2 and Python 3!",
+                    "Create games with Python, like Tic Tac Toe and Blackjack!",
+                    "Learn advanced Python features, like the collections module and how to work with timestamps!",
+                    "Learn to use Object Oriented Programming with classes!",
+                    "Understand complex topics, like decorators.",
+                    "Understand how to use both the Jupyter Notebook and create .py files",
+                    "Get an understanding of how to create GUIs in the Jupyter Notebook system!",
+                    "Build a complete understanding of Python from the ground up!"
+                },
+                Requirements = new List<string>
+                {
+                    "Access to a computer with an internet connection.",
+                    "No prior programming experience needed - I'll teach you everything you need to know"
+                },
+                Sections = new List<SectionData>
+                {
+                    new SectionData
+                    {
+                        Id = "intro",
+                        Title = "Course Introduction",
+                        Duration = 45,
+                        Lectures = new List<LectureData>
+                        {
+                            new LectureData { Title = "Introduction to the Course", Duration = 15 },
+                            new LectureData { Title = "Course Curriculum Overview", Duration = 10 },
+                            new LectureData { Title = "Course FAQs", Duration = 20 }
+                        }
+                    },
+                    new SectionData
+                    {
+                        Id = "setup",
+                        Title = "Python Setup",
+                        Duration = 60,
+                        Lectures = new List<LectureData>
+                        {
+                            new LectureData { Title = "Installing Python", Duration = 20 },
+                            new LectureData { Title = "Setting up Your Development Environment", Duration = 25 },
+                            new LectureData { Title = "Running Python Scripts", Duration = 15 }
+                        }
+                    }
+                }
+            },
+            _ => null
+        };
+    }
+
+    public class CourseDetailData
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string FullDescription { get; set; } = string.Empty;
+        public string Instructor { get; set; } = string.Empty;
+        public string InstructorId { get; set; } = string.Empty;
+        public double Rating { get; set; }
+        public int ReviewCount { get; set; }
+        public int StudentCount { get; set; }
+        public decimal Price { get; set; }
+        public decimal OriginalPrice { get; set; }
+        public double Duration { get; set; }
+        public int ArticleCount { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public List<string> LearningObjectives { get; set; } = new();
+        public List<string> Requirements { get; set; } = new();
+        public List<SectionData> Sections { get; set; } = new();
+    }
+
+    public class SectionData
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public int Duration { get; set; }
+        public List<LectureData> Lectures { get; set; } = new();
+    }
+
+    public class LectureData
+    {
+        public string Title { get; set; } = string.Empty;
+        public int Duration { get; set; }
+    }
+}

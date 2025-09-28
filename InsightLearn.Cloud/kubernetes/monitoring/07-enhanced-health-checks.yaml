@@ -1,0 +1,527 @@
+# Enhanced API Deployment with comprehensive health checks
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-api-enhanced
+  namespace: insightlearn
+  labels:
+    app: insightlearn-api
+    version: enhanced
+    component: application
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: insightlearn-api
+      version: enhanced
+  template:
+    metadata:
+      labels:
+        app: insightlearn-api
+        version: enhanced
+        component: application
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: api
+        image: insightlearn-api:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        - containerPort: 443
+          name: https
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ASPNETCORE_URLS
+          value: "http://+:80"
+        - name: ConnectionStrings__DefaultConnection
+          value: "Server=postgresql.insightlearn-data.svc.cluster.local,5432;Database=InsightLearnDb;User Id=insightlearn;Password=InsightLearn2024!;TrustServerCertificate=true;"
+        - name: ConnectionStrings__MongoDb
+          value: "mongodb://insightlearn:InsightLearn2024!@mongodb.insightlearn-data.svc.cluster.local:27017/InsightLearnDb?authSource=admin"
+        - name: ConnectionStrings__Redis
+          value: "redis.insightlearn-data.svc.cluster.local:6379"
+        - name: ConnectionStrings__Elasticsearch
+          value: "http://elasticsearch.insightlearn-data.svc.cluster.local:9200"
+        - name: AI__OllamaApiUrl
+          value: "http://ollama-service.insightlearn-ai.svc.cluster.local:11434"
+        - name: AI__DefaultModel
+          value: "llama2"
+        - name: Logging__LogLevel__Default
+          value: "Information"
+        - name: Logging__LogLevel__Microsoft.AspNetCore
+          value: "Warning"
+        # Monitoring configuration
+        - name: Prometheus__Enabled
+          value: "true"
+        - name: Prometheus__MetricsPath
+          value: "/metrics"
+        - name: Prometheus__Port
+          value: "9090"
+        - name: HealthChecks__Enabled
+          value: "true"
+        - name: Logging__Elasticsearch__Enabled
+          value: "true"
+        - name: OpenTelemetry__Enabled
+          value: "true"
+        volumeMounts:
+        - name: temp-volume
+          mountPath: /tmp
+        - name: monitoring-config
+          mountPath: /app/appsettings.Monitoring.json
+          subPath: appsettings.Monitoring.json
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "800m"
+        # Comprehensive health checks
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 80
+            httpHeaders:
+            - name: X-Health-Check
+              value: "liveness"
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 80
+            httpHeaders:
+            - name: X-Health-Check
+              value: "readiness"
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 80
+            httpHeaders:
+            - name: X-Health-Check
+              value: "startup"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+      volumes:
+      - name: temp-volume
+        emptyDir: {}
+      - name: monitoring-config
+        configMap:
+          name: dotnet-monitoring-config
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - insightlearn-api
+              topologyKey: kubernetes.io/hostname
+
+---
+# Enhanced Web Deployment with comprehensive health checks
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-web-enhanced
+  namespace: insightlearn
+  labels:
+    app: insightlearn-web
+    version: enhanced
+    component: application
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: insightlearn-web
+      version: enhanced
+  template:
+    metadata:
+      labels:
+        app: insightlearn-web
+        version: enhanced
+        component: application
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: web
+        image: insightlearn-web:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        - containerPort: 443
+          name: https
+          protocol: TCP
+        - containerPort: 9091
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ASPNETCORE_URLS
+          value: "http://+:80"
+        - name: ApiSettings__BaseUrl
+          value: "http://insightlearn-api.insightlearn.svc.cluster.local"
+        - name: Logging__LogLevel__Default
+          value: "Information"
+        - name: Logging__LogLevel__Microsoft.AspNetCore
+          value: "Warning"
+        # Monitoring configuration
+        - name: Prometheus__Enabled
+          value: "true"
+        - name: Prometheus__MetricsPath
+          value: "/metrics"
+        - name: Prometheus__Port
+          value: "9091"
+        - name: HealthChecks__Enabled
+          value: "true"
+        - name: Logging__Elasticsearch__Enabled
+          value: "true"
+        volumeMounts:
+        - name: temp-volume
+          mountPath: /tmp
+        - name: monitoring-config
+          mountPath: /app/appsettings.Monitoring.json
+          subPath: appsettings.Monitoring.json
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        # Comprehensive health checks
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 80
+            httpHeaders:
+            - name: X-Health-Check
+              value: "liveness"
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 80
+            httpHeaders:
+            - name: X-Health-Check
+              value: "readiness"
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 80
+            httpHeaders:
+            - name: X-Health-Check
+              value: "startup"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+      volumes:
+      - name: temp-volume
+        emptyDir: {}
+      - name: monitoring-config
+        configMap:
+          name: dotnet-monitoring-config
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - insightlearn-web
+              topologyKey: kubernetes.io/hostname
+
+---
+# Health Check ConfigMap for custom health checks
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-check-config
+  namespace: insightlearn
+  labels:
+    app: insightlearn-health
+data:
+  health-checks.json: |
+    {
+      "HealthCheckOptions": {
+        "AllowCachingResponses": false,
+        "ResultStatusCodes": {
+          "Healthy": 200,
+          "Degraded": 200,
+          "Unhealthy": 503
+        },
+        "Predicate": null,
+        "ResponseWriter": "Detailed"
+      },
+      "Checks": [
+        {
+          "Name": "Database",
+          "Type": "SqlServer",
+          "ConnectionString": "ConnectionStrings:DefaultConnection",
+          "Query": "SELECT 1",
+          "Timeout": "00:00:30",
+          "Tags": ["database", "postgresql"],
+          "FailureStatus": "Unhealthy"
+        },
+        {
+          "Name": "MongoDB",
+          "Type": "MongoDb",
+          "ConnectionString": "ConnectionStrings:MongoDb",
+          "DatabaseName": "InsightLearnDb",
+          "Timeout": "00:00:30",
+          "Tags": ["database", "mongodb"],
+          "FailureStatus": "Unhealthy"
+        },
+        {
+          "Name": "Redis",
+          "Type": "Redis",
+          "ConnectionString": "ConnectionStrings:Redis",
+          "Timeout": "00:00:10",
+          "Tags": ["cache", "redis"],
+          "FailureStatus": "Degraded"
+        },
+        {
+          "Name": "Elasticsearch",
+          "Type": "Elasticsearch",
+          "Uri": "ConnectionStrings:Elasticsearch",
+          "Timeout": "00:00:15",
+          "Tags": ["search", "elasticsearch"],
+          "FailureStatus": "Degraded"
+        },
+        {
+          "Name": "AI Service",
+          "Type": "Uri",
+          "Uri": "http://ollama-service.insightlearn-ai.svc.cluster.local:11434/health",
+          "Timeout": "00:00:20",
+          "Tags": ["ai", "ollama"],
+          "FailureStatus": "Degraded",
+          "ExpectedHttpCodes": [200, 404]
+        },
+        {
+          "Name": "Disk Space",
+          "Type": "DiskStorage",
+          "Path": "/tmp",
+          "MinimumFreeMegabytes": 100,
+          "Tags": ["infrastructure", "disk"],
+          "FailureStatus": "Degraded"
+        },
+        {
+          "Name": "Memory Usage",
+          "Type": "MemoryUsage",
+          "MaximumMegabytes": 1024,
+          "Tags": ["infrastructure", "memory"],
+          "FailureStatus": "Degraded"
+        }
+      ],
+      "UI": {
+        "EvaluationTimeOnUI": "00:00:10",
+        "MaximumExecutionHistoryEntriesPerEndpoint": 50,
+        "ApiPath": "/health-api",
+        "UIPath": "/health-ui",
+        "AsideMenuOpened": true,
+        "WebHookNotificationEnabled": false
+      }
+    }
+
+---
+# Database Health Check Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-health-monitor
+  namespace: insightlearn
+  labels:
+    app: database-health-monitor
+    component: monitoring
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: default
+          containers:
+          - name: health-checker
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Checking database health..."
+
+              # Check PostgreSQL
+              if ! nc -z postgresql.insightlearn-data.svc.cluster.local 5432; then
+                echo "PostgreSQL is not reachable"
+                exit 1
+              fi
+
+              # Check MongoDB
+              if ! nc -z mongodb.insightlearn-data.svc.cluster.local 27017; then
+                echo "MongoDB is not reachable"
+                exit 1
+              fi
+
+              # Check Redis
+              if ! nc -z redis.insightlearn-data.svc.cluster.local 6379; then
+                echo "Redis is not reachable"
+                exit 1
+              fi
+
+              # Check Elasticsearch
+              if ! curl -f http://elasticsearch.insightlearn-data.svc.cluster.local:9200/_cluster/health; then
+                echo "Elasticsearch is not healthy"
+                exit 1
+              fi
+
+              echo "All database services are healthy"
+          restartPolicy: OnFailure
+
+---
+# Service dependency health check
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dependency-health-script
+  namespace: insightlearn
+  labels:
+    app: dependency-health
+data:
+  check-dependencies.sh: |
+    #!/bin/sh
+
+    FAILED=0
+
+    echo "=== InsightLearn Service Dependency Health Check ==="
+    echo "Timestamp: $(date)"
+    echo ""
+
+    # Check API Service
+    echo "Checking API Service..."
+    if curl -f -m 10 http://insightlearn-api.insightlearn.svc.cluster.local/health > /dev/null 2>&1; then
+        echo "✓ API Service is healthy"
+    else
+        echo "✗ API Service is not responding"
+        FAILED=1
+    fi
+
+    # Check Web Service
+    echo "Checking Web Service..."
+    if curl -f -m 10 http://insightlearn-web.insightlearn.svc.cluster.local/health > /dev/null 2>&1; then
+        echo "✓ Web Service is healthy"
+    else
+        echo "✗ Web Service is not responding"
+        FAILED=1
+    fi
+
+    # Check Monitoring Services
+    echo "Checking Prometheus..."
+    if curl -f -m 10 http://prometheus.insightlearn-monitoring.svc.cluster.local:9090/-/healthy > /dev/null 2>&1; then
+        echo "✓ Prometheus is healthy"
+    else
+        echo "✗ Prometheus is not responding"
+        FAILED=1
+    fi
+
+    echo "Checking Grafana..."
+    if curl -f -m 10 http://grafana.insightlearn-monitoring.svc.cluster.local:3000/api/health > /dev/null 2>&1; then
+        echo "✓ Grafana is healthy"
+    else
+        echo "✗ Grafana is not responding"
+        FAILED=1
+    fi
+
+    echo "Checking AlertManager..."
+    if curl -f -m 10 http://alertmanager.insightlearn-monitoring.svc.cluster.local:9093/-/healthy > /dev/null 2>&1; then
+        echo "✓ AlertManager is healthy"
+    else
+        echo "✗ AlertManager is not responding"
+        FAILED=1
+    fi
+
+    echo ""
+    if [ $FAILED -eq 0 ]; then
+        echo "=== ALL SERVICES HEALTHY ==="
+        exit 0
+    else
+        echo "=== SOME SERVICES ARE FAILING ==="
+        exit 1
+    fi
+
+---
+# Dependency Health Check Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: service-dependency-health-check
+  namespace: insightlearn
+  labels:
+    app: service-dependency-health
+    component: monitoring
+spec:
+  schedule: "*/2 * * * *"  # Every 2 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: default
+          containers:
+          - name: dependency-checker
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - /scripts/check-dependencies.sh
+            volumeMounts:
+            - name: health-script
+              mountPath: /scripts
+          volumes:
+          - name: health-script
+            configMap:
+              name: dependency-health-script
+              defaultMode: 0755
+          restartPolicy: OnFailure

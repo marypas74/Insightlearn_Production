@@ -1,0 +1,1480 @@
+# Prompt per Claude Code - Fase 2 Aggiuntiva: Kubernetes e Docker Setup
+
+## 🎯 Obiettivo della Fase
+Configurare Kubernetes su Debian 13 e preparare l'ambiente Docker per il deployment di InsightLearn.Cloud. Questa fase garantisce che l'infrastruttura container sia pronta fin dall'inizio per test e deployment continui.
+
+## ⚙️ Configurazioni Operative Debian
+
+### Sistema di Logging e Error Handling
+- **OBBLIGATORIO**: Ogni comando bash deve generare un log dettagliato
+- **TIMEOUT**: Tutti i comandi hanno timeout di 10 minuti
+- **AUTO-RECOVERY**: Se un comando fallisce, devi rigenerarlo con correzioni
+- **VERIFICA**: Ogni step deve essere verificato prima di procedere al successivo
+
+### Template di Esecuzione per Debian con Sudo
+```bash
+#!/bin/bash
+set -e  # Exit on error
+set -u  # Exit on undefined variable
+
+# Setup logging
+LOG_FILE="logs/phase2_k8s_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] Starting Phase 2 K8s command: $0 ===" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian system operations
+SUDO_PASS="SS1-Temp1234"
+
+# Function to run sudo commands with password
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+# Timeout function for Debian
+timeout_cmd() {
+    timeout 600s "$@"  # 10 minutes timeout
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+# Error handling function
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Command failed ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+# Check if we're in the right directory
+if [ ! -d "InsightLearn.Cloud" ]; then
+    echo "ERROR: InsightLearn.Cloud directory not found. Please run from project root." | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+cd InsightLearn.Cloud
+```
+
+## 📋 FASE 2 AGGIUNTIVA: Kubernetes e Docker Setup
+
+### STEP 2A.1: Preparazione Sistema e Prerequisiti
+
+**Comando da eseguire:**
+```bash
+#!/bin/bash
+# phase2a_step1_system_preparation.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2a_step1_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 2A STEP 1: System Preparation ===" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian system operations
+SUDO_PASS="SS1-Temp1234"
+
+# Function to run sudo commands with password
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 2A.1 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+cd InsightLearn.Cloud
+echo "Current directory: $(pwd)" | tee -a "$LOG_FILE"
+
+# Check system information
+echo "System information:" | tee -a "$LOG_FILE"
+echo "OS: $(cat /etc/os-release | grep PRETTY_NAME)" | tee -a "$LOG_FILE"
+echo "Kernel: $(uname -r)" | tee -a "$LOG_FILE"
+echo "Architecture: $(uname -m)" | tee -a "$LOG_FILE"
+echo "Memory: $(free -h | grep '^Mem:' | awk '{print $2}')" | tee -a "$LOG_FILE"
+echo "CPU: $(nproc) cores" | tee -a "$LOG_FILE"
+
+# Update system packages
+echo "Updating system packages..." | tee -a "$LOG_FILE"
+timeout_cmd sudo_cmd apt update
+timeout_cmd sudo_cmd apt upgrade -y
+
+# Install essential packages
+echo "Installing essential packages..." | tee -a "$LOG_FILE"
+timeout_cmd sudo_cmd apt install -y \
+    curl \
+    wget \
+    gnupg \
+    lsb-release \
+    ca-certificates \
+    apt-transport-https \
+    software-properties-common \
+    build-essential \
+    git \
+    vim \
+    htop \
+    net-tools \
+    tree \
+    jq
+
+# Verify installations
+echo "Verifying essential tools..." | tee -a "$LOG_FILE"
+for tool in curl wget git jq; do
+    if command -v $tool > /dev/null 2>&1; then
+        VERSION=$(timeout_cmd $tool --version | head -n1)
+        echo "✅ $tool: $VERSION" | tee -a "$LOG_FILE"
+    else
+        echo "❌ $tool not found" | tee -a "$LOG_FILE"
+        exit 1
+    fi
+done
+
+# Check if running in VM or physical machine
+echo "Hardware detection..." | tee -a "$LOG_FILE"
+if timeout_cmd sudo_cmd dmidecode -s system-product-name 2>/dev/null | grep -i "virtual\|vmware\|virtualbox"; then
+    echo "⚠️  Running in virtual machine" | tee -a "$LOG_FILE"
+    VM_ENVIRONMENT=true
+else
+    echo "✅ Running on physical machine" | tee -a "$LOG_FILE"
+    VM_ENVIRONMENT=false
+fi
+
+# Check available resources
+TOTAL_MEM=$(free -m | awk 'NR==2{printf "%.1f", $2/1024}')
+if (( $(echo "$TOTAL_MEM >= 4.0" | bc -l) )); then
+    echo "✅ Memory: ${TOTAL_MEM}GB (sufficient for Kubernetes)" | tee -a "$LOG_FILE"
+else
+    echo "⚠️  Memory: ${TOTAL_MEM}GB (minimum for K8s, may need optimization)" | tee -a "$LOG_FILE"
+fi
+
+AVAILABLE_DISK=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+if [ "$AVAILABLE_DISK" -gt 20 ]; then
+    echo "✅ Disk space: ${AVAILABLE_DISK}GB available (sufficient)" | tee -a "$LOG_FILE"
+else
+    echo "❌ Disk space: ${AVAILABLE_DISK}GB available (insufficient, need 20GB+)" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Disable swap for Kubernetes (required)
+echo "Configuring system for Kubernetes..." | tee -a "$LOG_FILE"
+if timeout_cmd sudo_cmd swapoff -a; then
+    echo "✅ Swap disabled" | tee -a "$LOG_FILE"
+    # Make permanent
+    timeout_cmd sudo_cmd sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+    echo "✅ Swap permanently disabled" | tee -a "$LOG_FILE"
+else
+    echo "⚠️  Could not disable swap (may not be configured)" | tee -a "$LOG_FILE"
+fi
+
+# Enable IP forwarding
+echo "Enabling IP forwarding..." | tee -a "$LOG_FILE"
+echo 'net.ipv4.ip_forward = 1' | timeout_cmd sudo_cmd tee -a /etc/sysctl.conf
+timeout_cmd sudo_cmd sysctl -p
+
+# Configure kernel modules for containers
+echo "Configuring kernel modules..." | tee -a "$LOG_FILE"
+cat << EOF | timeout_cmd sudo_cmd tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+
+timeout_cmd sudo_cmd modprobe overlay
+timeout_cmd sudo_cmd modprobe br_netfilter
+
+# Configure sysctl for Kubernetes
+cat << EOF | timeout_cmd sudo_cmd tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+
+timeout_cmd sudo_cmd sysctl --system
+
+echo "=== [$(date)] Step 2A.1 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+### STEP 2A.2: Installazione Docker
+
+**Comando da eseguire dopo successo Step 2A.1:**
+```bash
+#!/bin/bash
+# phase2a_step2_docker_installation.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2a_step2_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 2A STEP 2: Docker Installation ===" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian system operations
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 2A.2 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+cd InsightLearn.Cloud
+
+# Check if Docker is already installed
+if command -v docker > /dev/null 2>&1; then
+    DOCKER_VERSION=$(timeout_cmd docker --version)
+    echo "Docker already installed: $DOCKER_VERSION" | tee -a "$LOG_FILE"
+    echo "Skipping Docker installation..." | tee -a "$LOG_FILE"
+else
+    echo "Installing Docker..." | tee -a "$LOG_FILE"
+    
+    # Remove old Docker versions
+    echo "Removing old Docker versions..." | tee -a "$LOG_FILE"
+    timeout_cmd sudo_cmd apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+    
+    # Install Docker's official GPG key
+    echo "Adding Docker GPG key..." | tee -a "$LOG_FILE"
+    timeout_cmd sudo_cmd install -m 0755 -d /etc/apt/keyrings
+    timeout_cmd curl -fsSL https://download.docker.com/linux/debian/gpg | timeout_cmd sudo_cmd gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    timeout_cmd sudo_cmd chmod a+r /etc/apt/keyrings/docker.gpg
+    
+    # Add Docker repository
+    echo "Adding Docker repository..." | tee -a "$LOG_FILE"
+    echo \
+      "deb [arch=\"$(dpkg --print-architecture)\" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+      \"$(. /etc/os-release && echo \"$VERSION_CODENAME\")\" stable" | \
+      timeout_cmd sudo_cmd tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # Update package index
+    echo "Updating package index..." | tee -a "$LOG_FILE"
+    timeout_cmd sudo_cmd apt update
+    
+    # Install Docker Engine
+    echo "Installing Docker Engine..." | tee -a "$LOG_FILE"
+    timeout_cmd sudo_cmd apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+fi
+
+# Configure Docker daemon
+echo "Configuring Docker daemon..." | tee -a "$LOG_FILE"
+timeout_cmd sudo_cmd mkdir -p /etc/docker
+
+# Create Docker daemon configuration for Kubernetes compatibility
+cat << EOF | timeout_cmd sudo_cmd tee /etc/docker/daemon.json
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2",
+  "features": {
+    "buildkit": true
+  }
+}
+EOF
+
+# Enable and start Docker
+echo "Starting Docker service..." | tee -a "$LOG_FILE"
+timeout_cmd sudo_cmd systemctl daemon-reload
+timeout_cmd sudo_cmd systemctl enable docker
+timeout_cmd sudo_cmd systemctl start docker
+
+# Add current user to Docker group
+echo "Adding user to Docker group..." | tee -a "$LOG_FILE"
+timeout_cmd sudo_cmd usermod -aG docker $USER
+
+# Verify Docker installation
+echo "Verifying Docker installation..." | tee -a "$LOG_FILE"
+timeout_cmd sudo_cmd docker --version | tee -a "$LOG_FILE"
+timeout_cmd sudo_cmd docker compose version | tee -a "$LOG_FILE"
+
+# Test Docker functionality
+echo "Testing Docker functionality..." | tee -a "$LOG_FILE"
+if timeout_cmd sudo_cmd docker run --rm hello-world > /dev/null 2>&1; then
+    echo "✅ Docker test successful" | tee -a "$LOG_FILE"
+else
+    echo "❌ Docker test failed" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Configure containerd for Kubernetes
+echo "Configuring containerd..." | tee -a "$LOG_FILE"
+timeout_cmd sudo_cmd mkdir -p /etc/containerd
+timeout_cmd containerd config default | timeout_cmd sudo_cmd tee /etc/containerd/config.toml
+
+# Update containerd config for Kubernetes
+timeout_cmd sudo_cmd sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+
+# Restart containerd
+timeout_cmd sudo_cmd systemctl restart containerd
+timeout_cmd sudo_cmd systemctl enable containerd
+
+# Verify containerd
+if timeout_cmd sudo_cmd systemctl is-active containerd > /dev/null 2>&1; then
+    echo "✅ Containerd is running" | tee -a "$LOG_FILE"
+else
+    echo "❌ Containerd is not running" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+echo "=== [$(date)] Step 2A.2 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+### STEP 2A.3: Installazione Kubernetes (kubeadm, kubelet, kubectl)
+
+**Comando da eseguire dopo successo Step 2A.2:**
+```bash
+#!/bin/bash
+# phase2a_step3_kubernetes_installation.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2a_step3_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 2A STEP 3: Kubernetes Installation ===" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian system operations
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 2A.3 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+cd InsightLearn.Cloud
+
+# Check if Kubernetes tools are already installed
+if command -v kubectl > /dev/null 2>&1; then
+    KUBECTL_VERSION=$(timeout_cmd kubectl version --client --short 2>/dev/null || kubectl version --client)
+    echo "kubectl already installed: $KUBECTL_VERSION" | tee -a "$LOG_FILE"
+else
+    echo "Installing Kubernetes tools..." | tee -a "$LOG_FILE"
+    
+    # Add Kubernetes GPG key
+    echo "Adding Kubernetes GPG key..." | tee -a "$LOG_FILE"
+    timeout_cmd curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | timeout_cmd sudo_cmd gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    
+    # Add Kubernetes repository
+    echo "Adding Kubernetes repository..." | tee -a "$LOG_FILE"
+    echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | timeout_cmd sudo_cmd tee /etc/apt/sources.list.d/kubernetes.list
+    
+    # Update package index
+    echo "Updating package index..." | tee -a "$LOG_FILE"
+    timeout_cmd sudo_cmd apt update
+    
+    # Install Kubernetes tools
+    echo "Installing kubeadm, kubelet, and kubectl..." | tee -a "$LOG_FILE"
+    timeout_cmd sudo_cmd apt install -y kubelet kubeadm kubectl
+    
+    # Hold packages to prevent auto-updates
+    timeout_cmd sudo_cmd apt-mark hold kubelet kubeadm kubectl
+fi
+
+# Verify installations
+echo "Verifying Kubernetes tools..." | tee -a "$LOG_FILE"
+for tool in kubeadm kubelet kubectl; do
+    if command -v $tool > /dev/null 2>&1; then
+        VERSION=$(timeout_cmd $tool version --short 2>/dev/null || timeout_cmd $tool version --client --short 2>/dev/null || echo "installed")
+        echo "✅ $tool: $VERSION" | tee -a "$LOG_FILE"
+    else
+        echo "❌ $tool not found" | tee -a "$LOG_FILE"
+        exit 1
+    fi
+done
+
+# Enable kubelet service
+echo "Enabling kubelet service..." | tee -a "$LOG_FILE"
+timeout_cmd sudo_cmd systemctl enable kubelet
+
+# Check kubelet status (it's normal for it to be inactive before cluster init)
+KUBELET_STATUS=$(timeout_cmd sudo_cmd systemctl is-active kubelet || echo "inactive")
+echo "Kubelet status: $KUBELET_STATUS (normal before cluster initialization)" | tee -a "$LOG_FILE"
+
+echo "=== [$(date)] Step 2A.3 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+### STEP 2A.4: Inizializzazione Cluster Kubernetes
+
+**Comando da eseguire dopo successo Step 2A.3:**
+```bash
+#!/bin/bash
+# phase2a_step4_kubernetes_cluster_init.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2a_step4_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 2A STEP 4: Kubernetes Cluster Initialization ===" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian system operations
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 2A.4 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+cd InsightLearn.Cloud
+
+# Check if cluster is already initialized
+if timeout_cmd sudo_cmd kubectl cluster-info > /dev/null 2>&1; then
+    echo "Kubernetes cluster already initialized" | tee -a "$LOG_FILE"
+    timeout_cmd sudo_cmd kubectl cluster-info | tee -a "$LOG_FILE"
+else
+    echo "Initializing Kubernetes cluster..." | tee -a "$LOG_FILE"
+    
+    # Get local IP address
+    LOCAL_IP=$(hostname -I | awk '{print $1}')
+    echo "Local IP address: $LOCAL_IP" | tee -a "$LOG_FILE"
+    
+    # Initialize cluster with kubeadm
+    echo "Running kubeadm init..." | tee -a "$LOG_FILE"
+    timeout_cmd sudo_cmd kubeadm init \
+        --apiserver-advertise-address=$LOCAL_IP \
+        --pod-network-cidr=10.244.0.0/16 \
+        --service-cidr=10.96.0.0/12 \
+        --cri-socket=unix:///var/run/containerd/containerd.sock | tee -a "$LOG_FILE"
+    
+    # Setup kubectl for current user
+    echo "Setting up kubectl for current user..." | tee -a "$LOG_FILE"
+    mkdir -p $HOME/.kube
+    timeout_cmd sudo_cmd cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+    timeout_cmd sudo_cmd chown $(id -u):$(id -g) $HOME/.kube/config
+    
+    # Also setup for root user
+    echo "Setting up kubectl for root user..." | tee -a "$LOG_FILE"
+    timeout_cmd sudo_cmd mkdir -p /root/.kube
+    timeout_cmd sudo_cmd cp -i /etc/kubernetes/admin.conf /root/.kube/config
+fi
+
+# Verify cluster status
+echo "Verifying cluster status..." | tee -a "$LOG_FILE"
+timeout_cmd kubectl cluster-info | tee -a "$LOG_FILE"
+timeout_cmd kubectl get nodes | tee -a "$LOG_FILE"
+
+# Install CNI (Container Network Interface) - Flannel
+echo "Installing Flannel CNI..." | tee -a "$LOG_FILE"
+if ! timeout_cmd kubectl get pods -n kube-flannel > /dev/null 2>&1; then
+    timeout_cmd kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+    echo "✅ Flannel CNI installed" | tee -a "$LOG_FILE"
+else
+    echo "✅ Flannel CNI already installed" | tee -a "$LOG_FILE"
+fi
+
+# Remove taint from master node (for single-node cluster)
+echo "Configuring single-node cluster..." | tee -a "$LOG_FILE"
+NODE_NAME=$(timeout_cmd kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+timeout_cmd kubectl taint nodes $NODE_NAME node-role.kubernetes.io/control-plane- || true
+
+# Wait for all system pods to be ready
+echo "Waiting for system pods to be ready..." | tee -a "$LOG_FILE"
+timeout_cmd kubectl wait --for=condition=Ready pods --all -n kube-system --timeout=300s
+
+# Verify all pods are running
+echo "Verifying all system pods..." | tee -a "$LOG_FILE"
+timeout_cmd kubectl get pods -n kube-system | tee -a "$LOG_FILE"
+
+# Check cluster health
+echo "Checking cluster health..." | tee -a "$LOG_FILE"
+if timeout_cmd kubectl get cs > /dev/null 2>&1; then
+    timeout_cmd kubectl get cs | tee -a "$LOG_FILE"
+fi
+
+# Create namespace for InsightLearn
+echo "Creating namespace for InsightLearn..." | tee -a "$LOG_FILE"
+if ! timeout_cmd kubectl get namespace insightlearn > /dev/null 2>&1; then
+    timeout_cmd kubectl create namespace insightlearn
+    echo "✅ Namespace 'insightlearn' created" | tee -a "$LOG_FILE"
+else
+    echo "✅ Namespace 'insightlearn' already exists" | tee -a "$LOG_FILE"
+fi
+
+# Label the namespace
+timeout_cmd kubectl label namespace insightlearn name=insightlearn --overwrite
+
+# Verify final cluster status
+echo "Final cluster verification..." | tee -a "$LOG_FILE"
+timeout_cmd kubectl get nodes -o wide | tee -a "$LOG_FILE"
+timeout_cmd kubectl get namespaces | tee -a "$LOG_FILE"
+
+echo "=== [$(date)] Step 2A.4 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+### STEP 2A.5: Setup Base Kubernetes Manifests
+
+**Comando da eseguire dopo successo Step 2A.4:**
+```bash
+#!/bin/bash
+# phase2a_step5_kubernetes_manifests.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2a_step5_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 2A STEP 5: Kubernetes Manifests Setup ===" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian system operations
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+timeout_cmd() {
+    timeout 600s "$@"
+    local exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "ERROR: Command timed out after 10 minutes" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    return $exit_code
+}
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    echo "ERROR: Command failed with exit code $exit_code on line $line_number" | tee -a "$LOG_FILE"
+    echo "=== [$(date)] Step 2A.5 FAILED ===" | tee -a "$LOG_FILE"
+    return $exit_code
+}
+trap 'handle_error $? $LINENO' ERR
+
+cd InsightLearn.Cloud
+
+# Create namespace manifest
+echo "Creating namespace manifest..." | tee -a "$LOG_FILE"
+cat > kubernetes/namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: insightlearn
+  labels:
+    name: insightlearn
+    environment: development
+    project: insightlearn-cloud
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: insightlearn-monitoring
+  labels:
+    name: insightlearn-monitoring
+    environment: development
+    project: insightlearn-cloud
+EOF
+
+# Create configmap for application settings
+echo "Creating configmap manifests..." | tee -a "$LOG_FILE"
+cat > kubernetes/configmaps/app-config.yaml << 'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insightlearn-config
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: config
+data:
+  # Application settings
+  ASPNETCORE_ENVIRONMENT: "Development"
+  ASPNETCORE_URLS: "http://+:80"
+  
+  # Database settings (will be overridden by secrets)
+  ConnectionStrings__DefaultConnection: ""
+  ConnectionStrings__MongoConnection: ""
+  ConnectionStrings__RedisConnection: ""
+  ConnectionStrings__ElasticsearchConnection: ""
+  
+  # Feature flags
+  Features__EnableAI: "true"
+  Features__EnableAnalytics: "true"
+  Features__EnableCaching: "true"
+  
+  # Logging
+  Logging__LogLevel__Default: "Information"
+  Logging__LogLevel__Microsoft: "Warning"
+  Logging__LogLevel__Microsoft.Hosting.Lifetime: "Information"
+EOF
+
+# Create secrets template
+echo "Creating secrets manifests..." | tee -a "$LOG_FILE"
+cat > kubernetes/secrets/app-secrets.yaml << 'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: insightlearn-secrets
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: secrets
+type: Opaque
+data:
+  # Note: All values must be base64 encoded
+  # Use: echo -n 'your-secret' | base64
+  
+  # Database connections (base64 encoded)
+  sql-connection: ""
+  mongo-connection: ""
+  redis-connection: ""
+  elasticsearch-connection: ""
+  
+  # JWT settings
+  jwt-secret: ""
+  jwt-issuer: ""
+  jwt-audience: ""
+  
+  # Google OAuth
+  google-client-id: ""
+  google-client-secret: ""
+  
+  # AI/Ollama settings
+  ollama-api-key: ""
+  ollama-endpoint: ""
+  
+  # External services
+  email-api-key: ""
+  storage-connection: ""
+EOF
+
+# Create base deployment template
+echo "Creating deployment manifests..." | tee -a "$LOG_FILE"
+cat > kubernetes/deployments/web-deployment.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-web
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: web
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insightlearn
+      component: web
+  template:
+    metadata:
+      labels:
+        app: insightlearn
+        component: web
+        version: v1
+    spec:
+      containers:
+      - name: web
+        image: insightlearn/web:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+        envFrom:
+        - configMapRef:
+            name: insightlearn-config
+        - secretRef:
+            name: insightlearn-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-api
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: api
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insightlearn
+      component: api
+  template:
+    metadata:
+      labels:
+        app: insightlearn
+        component: api
+        version: v1
+    spec:
+      containers:
+      - name: api
+        image: insightlearn/api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+        envFrom:
+        - configMapRef:
+            name: insightlearn-config
+        - secretRef:
+            name: insightlearn-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30
+EOF
+
+# Create services
+echo "Creating service manifests..." | tee -a "$LOG_FILE"
+cat > kubernetes/services/web-service.yaml << 'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightlearn-web-service
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: web
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: insightlearn
+    component: web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightlearn-api-service
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: insightlearn
+    component: api
+EOF
+
+# Create ingress
+echo "Creating ingress manifest..." | tee -a "$LOG_FILE"
+cat > kubernetes/ingress.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: insightlearn-ingress
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  rules:
+  - host: insightlearn.local
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: insightlearn-api-service
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: insightlearn-web-service
+            port:
+              number: 80
+EOF
+
+# Create Docker Compose for development
+echo "Creating Docker Compose for local development..." | tee -a "$LOG_FILE"
+cat > docker/docker-compose.yml << 'EOF'
+version: '3.8'
+
+services:
+  # SQL Server for main database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: insightlearn-sqlserver
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: "InsightLearn@2024"
+      MSSQL_PID: Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - insightlearn-network
+
+  # MongoDB for video and content storage
+  mongodb:
+    image: mongo:7
+    container_name: insightlearn-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: "InsightLearn@2024"
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - insightlearn-network
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: insightlearn-redis
+    command: redis-server --requirepass "InsightLearn@2024"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - insightlearn-network
+
+  # Elasticsearch for search and analytics
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: insightlearn-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - insightlearn-network
+
+  # Ollama for AI functionality
+  ollama:
+    image: ollama/ollama:latest
+    container_name: insightlearn-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - insightlearn-network
+
+volumes:
+  sqlserver_data:
+  mongodb_data:
+  redis_data:
+  elasticsearch_data:
+  ollama_data:
+
+networks:
+  insightlearn-network:
+    driver: bridge
+EOF
+
+# Create basic Dockerfiles
+echo "Creating Dockerfiles..." | tee -a "$LOG_FILE"
+cat > docker/Dockerfile.web << 'EOF'
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["src/InsightLearn.Web/InsightLearn.Web.csproj", "InsightLearn.Web/"]
+COPY ["src/InsightLearn.Core/InsightLearn.Core.csproj", "InsightLearn.Core/"]
+COPY ["src/InsightLearn.Infrastructure/InsightLearn.Infrastructure.csproj", "InsightLearn.Infrastructure/"]
+COPY ["src/InsightLearn.AI/InsightLearn.AI.csproj", "InsightLearn.AI/"]
+RUN dotnet restore "InsightLearn.Web/InsightLearn.Web.csproj"
+COPY src/ .
+WORKDIR "/src/InsightLearn.Web"
+RUN dotnet build "InsightLearn.Web.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "InsightLearn.Web.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "InsightLearn.Web.dll"]
+EOF
+
+cat > docker/Dockerfile.api << 'EOF'
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["src/InsightLearn.Api/InsightLearn.Api.csproj", "InsightLearn.Api/"]
+COPY ["src/InsightLearn.Core/InsightLearn.Core.csproj", "InsightLearn.Core/"]
+COPY ["src/InsightLearn.Infrastructure/InsightLearn.Infrastructure.csproj", "InsightLearn.Infrastructure/"]
+COPY ["src/InsightLearn.AI/InsightLearn.AI.csproj", "InsightLearn.AI/"]
+RUN dotnet restore "InsightLearn.Api/InsightLearn.Api.csproj"
+COPY src/ .
+WORKDIR "/src/InsightLearn.Api"
+RUN dotnet build "InsightLearn.Api.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "InsightLearn.Api.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "InsightLearn.Api.dll"]
+EOF
+
+# Create helper scripts
+echo "Creating helper scripts..." | tee -a "$LOG_FILE"
+cat > scripts/k8s-deploy.sh << 'EOF'
+#!/bin/bash
+# Kubernetes deployment script
+
+set -e
+
+echo "🚀 Deploying InsightLearn.Cloud to Kubernetes..."
+
+# Apply namespace
+kubectl apply -f kubernetes/namespace.yaml
+
+# Apply configmaps
+kubectl apply -f kubernetes/configmaps/
+
+# Apply secrets (make sure to update with real values first)
+kubectl apply -f kubernetes/secrets/
+
+# Apply deployments
+kubectl apply -f kubernetes/deployments/
+
+# Apply services
+kubectl apply -f kubernetes/services/
+
+# Apply ingress
+kubectl apply -f kubernetes/ingress.yaml
+
+echo "✅ Deployment complete!"
+echo "📊 Checking status..."
+
+kubectl get pods -n insightlearn
+kubectl get services -n insightlearn
+kubectl get ingress -n insightlearn
+EOF
+
+cat > scripts/k8s-logs.sh << 'EOF'
+#!/bin/bash
+# Script to view logs from Kubernetes pods
+
+NAMESPACE=${1:-insightlearn}
+COMPONENT=${2:-web}
+
+if [ "$COMPONENT" = "all" ]; then
+    echo "🔍 Showing logs for all components..."
+    kubectl logs -n $NAMESPACE -l app=insightlearn --tail=100 -f
+else
+    echo "🔍 Showing logs for $COMPONENT component..."
+    kubectl logs -n $NAMESPACE -l app=insightlearn,component=$COMPONENT --tail=100 -f
+fi
+EOF
+
+cat > scripts/docker-dev.sh << 'EOF'
+#!/bin/bash
+# Script to start development environment with Docker Compose
+
+echo "🐳 Starting development environment..."
+
+# Start all services
+docker compose -f docker/docker-compose.yml up -d
+
+echo "✅ Development environment started!"
+echo "📊 Service status:"
+
+docker compose -f docker/docker-compose.yml ps
+
+echo ""
+echo "🔗 Connection strings:"
+echo "SQL Server: Server=localhost,1433;Database=InsightLearn;User Id=sa;Password=InsightLearn@2024;TrustServerCertificate=true;"
+echo "MongoDB: mongodb://admin:InsightLearn@2024@localhost:27017"
+echo "Redis: localhost:6379 (password: InsightLearn@2024)"
+echo "Elasticsearch: http://localhost:9200"
+echo "Ollama: http://localhost:11434"
+EOF
+
+# Make scripts executable
+chmod +x scripts/*.sh
+
+# Apply namespace and basic configuration
+echo "Applying base Kubernetes configuration..." | tee -a "$LOG_FILE"
+timeout_cmd kubectl apply -f kubernetes/namespace.yaml
+timeout_cmd kubectl apply -f kubernetes/configmaps/app-config.yaml
+
+echo "Verifying Kubernetes setup..." | tee -a "$LOG_FILE"
+timeout_cmd kubectl get namespaces | tee -a "$LOG_FILE"
+timeout_cmd kubectl get configmaps -n insightlearn | tee -a "$LOG_FILE"
+
+echo "=== [$(date)] Step 2A.5 COMPLETED SUCCESSFULLY ===" | tee -a "$LOG_FILE"
+```
+
+## 🔍 STEP 2A.6: Verifica Finale Kubernetes Setup
+
+```bash
+#!/bin/bash
+# phase2a_verification.sh
+
+set -e
+set -u
+
+# Setup logging
+LOG_FILE="logs/phase2a_verification_$(date +%Y%m%d_%H%M%S).log"
+REPORT_FILE="logs/PHASE2A_K8S_REPORT_$(date +%Y%m%d_%H%M%S).md"
+mkdir -p logs
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "========================================" | tee -a "$LOG_FILE"
+echo "FASE 2A: VERIFICA KUBERNETES SETUP" | tee -a "$LOG_FILE"
+echo "Data: $(date)" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+
+# Sudo password for Debian
+SUDO_PASS="SS1-Temp1234"
+
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+cd InsightLearn.Cloud
+
+ERRORS=0
+WARNINGS=0
+
+# Create report header
+cat > "$REPORT_FILE" << 'EOF'
+# InsightLearn.Cloud - Report Verifica Fase 2A (Kubernetes Setup)
+
+## 📅 Informazioni Generali
+EOF
+
+echo "- **Data Verifica**: $(date)" >> "$REPORT_FILE"
+echo "- **Fase**: Kubernetes e Docker Setup" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+echo "## 📊 Verifica Componenti Sistema" >> "$REPORT_FILE"
+
+# Check Docker
+echo "Verifica Docker..." | tee -a "$LOG_FILE"
+if command -v docker > /dev/null 2>&1; then
+    DOCKER_VERSION=$(docker --version)
+    echo "✅ Docker installato: $DOCKER_VERSION" | tee -a "$LOG_FILE"
+    echo "- ✅ **Docker**: $DOCKER_VERSION" >> "$REPORT_FILE"
+    
+    if sudo systemctl is-active docker > /dev/null 2>&1; then
+        echo "✅ Docker service attivo" | tee -a "$LOG_FILE"
+        echo "  - Service: ✅ Attivo" >> "$REPORT_FILE"
+    else
+        echo "❌ Docker service non attivo" | tee -a "$LOG_FILE"
+        echo "  - Service: ❌ Non attivo" >> "$REPORT_FILE"
+        ((ERRORS++))
+    fi
+else
+    echo "❌ Docker non installato" | tee -a "$LOG_FILE"
+    echo "- ❌ **Docker**: Non installato" >> "$REPORT_FILE"
+    ((ERRORS++))
+fi
+
+# Check Kubernetes tools
+echo "" >> "$REPORT_FILE"
+echo "### Kubernetes Tools" >> "$REPORT_FILE"
+
+for tool in kubectl kubeadm kubelet; do
+    echo "Verifica $tool..." | tee -a "$LOG_FILE"
+    if command -v $tool > /dev/null 2>&1; then
+        VERSION=$(timeout 10s $tool version --short 2>/dev/null || timeout 10s $tool version --client --short 2>/dev/null || echo "installed")
+        echo "✅ $tool: $VERSION" | tee -a "$LOG_FILE"
+        echo "- ✅ **$tool**: $VERSION" >> "$REPORT_FILE"
+    else
+        echo "❌ $tool non trovato" | tee -a "$LOG_FILE"
+        echo "- ❌ **$tool**: Non installato" >> "$REPORT_FILE"
+        ((ERRORS++))
+    fi
+done
+
+# Check cluster status
+echo "" >> "$REPORT_FILE"
+echo "### Cluster Status" >> "$REPORT_FILE"
+
+echo "Verifica cluster Kubernetes..." | tee -a "$LOG_FILE"
+if timeout 30s kubectl cluster-info > /dev/null 2>&1; then
+    echo "✅ Cluster Kubernetes attivo" | tee -a "$LOG_FILE"
+    echo "- ✅ **Cluster**: Attivo e raggiungibile" >> "$REPORT_FILE"
+    
+    # Get cluster info
+    CLUSTER_INFO=$(timeout 30s kubectl cluster-info)
+    echo "$CLUSTER_INFO" | tee -a "$LOG_FILE"
+    
+    # Check nodes
+    NODE_COUNT=$(timeout 30s kubectl get nodes --no-headers | wc -l)
+    echo "- **Nodi**: $NODE_COUNT nodo(i)" >> "$REPORT_FILE"
+    
+    # Check node status
+    NODE_STATUS=$(timeout 30s kubectl get nodes --no-headers | awk '{print $2}' | head -1)
+    if [ "$NODE_STATUS" = "Ready" ]; then
+        echo "✅ Nodo in stato Ready" | tee -a "$LOG_FILE"
+        echo "- **Status Nodo**: ✅ Ready" >> "$REPORT_FILE"
+    else
+        echo "⚠️  Nodo non in stato Ready: $NODE_STATUS" | tee -a "$LOG_FILE"
+        echo "- **Status Nodo**: ⚠️  $NODE_STATUS" >> "$REPORT_FILE"
+        ((WARNINGS++))
+    fi
+    
+else
+    echo "❌ Cluster Kubernetes non raggiungibile" | tee -a "$LOG_FILE"
+    echo "- ❌ **Cluster**: Non raggiungibile" >> "$REPORT_FILE"
+    ((ERRORS++))
+fi
+
+# Check system pods
+echo "" >> "$REPORT_FILE"
+echo "### System Pods" >> "$REPORT_FILE"
+
+echo "Verifica system pods..." | tee -a "$LOG_FILE"
+if timeout 30s kubectl get pods -n kube-system > /dev/null 2>&1; then
+    TOTAL_PODS=$(timeout 30s kubectl get pods -n kube-system --no-headers | wc -l)
+    RUNNING_PODS=$(timeout 30s kubectl get pods -n kube-system --no-headers | grep "Running" | wc -l)
+    echo "System pods: $RUNNING_PODS/$TOTAL_PODS running" | tee -a "$LOG_FILE"
+    echo "- **System Pods**: $RUNNING_PODS/$TOTAL_PODS running" >> "$REPORT_FILE"
+    
+    if [ $RUNNING_PODS -eq $TOTAL_PODS ]; then
+        echo "✅ Tutti i system pods sono running" | tee -a "$LOG_FILE"
+    else
+        echo "⚠️  Non tutti i system pods sono running" | tee -a "$LOG_FILE"
+        ((WARNINGS++))
+    fi
+else
+    echo "❌ Impossibile verificare system pods" | tee -a "$LOG_FILE"
+    echo "- ❌ **System Pods**: Verifica fallita" >> "$REPORT_FILE"
+    ((ERRORS++))
+fi
+
+# Check namespaces
+echo "" >> "$REPORT_FILE"
+echo "### Namespaces" >> "$REPORT_FILE"
+
+echo "Verifica namespaces..." | tee -a "$LOG_FILE"
+if timeout 30s kubectl get namespace insightlearn > /dev/null 2>&1; then
+    echo "✅ Namespace insightlearn esistente" | tee -a "$LOG_FILE"
+    echo "- ✅ **insightlearn**: Namespace creato" >> "$REPORT_FILE"
+else
+    echo "❌ Namespace insightlearn mancante" | tee -a "$LOG_FILE"
+    echo "- ❌ **insightlearn**: Namespace mancante" >> "$REPORT_FILE"
+    ((ERRORS++))
+fi
+
+# Check manifest files
+echo "" >> "$REPORT_FILE"
+echo "### Manifest Files" >> "$REPORT_FILE"
+
+echo "Verifica manifest files..." | tee -a "$LOG_FILE"
+declare -a REQUIRED_MANIFESTS=(
+    "kubernetes/namespace.yaml"
+    "kubernetes/configmaps/app-config.yaml"
+    "kubernetes/secrets/app-secrets.yaml"
+    "kubernetes/deployments/web-deployment.yaml"
+    "kubernetes/services/web-service.yaml"
+    "kubernetes/ingress.yaml"
+)
+
+for manifest in "${REQUIRED_MANIFESTS[@]}"; do
+    if [ -f "$manifest" ]; then
+        echo "✅ $(basename $manifest) exists" | tee -a "$LOG_FILE"
+        echo "- ✅ **$(basename $manifest)**" >> "$REPORT_FILE"
+    else
+        echo "❌ $(basename $manifest) missing" | tee -a "$LOG_FILE"
+        echo "- ❌ **$(basename $manifest)**: Missing" >> "$REPORT_FILE"
+        ((ERRORS++))
+    fi
+done
+
+# Check Docker files
+echo "" >> "$REPORT_FILE"
+echo "### Docker Files" >> "$REPORT_FILE"
+
+declare -a DOCKER_FILES=(
+    "docker/docker-compose.yml"
+    "docker/Dockerfile.web"
+    "docker/Dockerfile.api"
+)
+
+for dockerfile in "${DOCKER_FILES[@]}"; do
+    if [ -f "$dockerfile" ]; then
+        echo "✅ $(basename $dockerfile) exists" | tee -a "$LOG_FILE"
+        echo "- ✅ **$(basename $dockerfile)**" >> "$REPORT_FILE"
+    else
+        echo "❌ $(basename $dockerfile) missing" | tee -a "$LOG_FILE"
+        echo "- ❌ **$(basename $dockerfile)**: Missing" >> "$REPORT_FILE"
+        ((ERRORS++))
+    fi
+done
+
+# Check helper scripts
+echo "" >> "$REPORT_FILE"
+echo "### Helper Scripts" >> "$REPORT_FILE"
+
+declare -a SCRIPTS=(
+    "scripts/k8s-deploy.sh"
+    "scripts/k8s-logs.sh"
+    "scripts/docker-dev.sh"
+)
+
+for script in "${SCRIPTS[@]}"; do
+    if [ -f "$script" ] && [ -x "$script" ]; then
+        echo "✅ $(basename $script) exists and executable" | tee -a "$LOG_FILE"
+        echo "- ✅ **$(basename $script)**: Executable" >> "$REPORT_FILE"
+    elif [ -f "$script" ]; then
+        echo "⚠️  $(basename $script) exists but not executable" | tee -a "$LOG_FILE"
+        echo "- ⚠️  **$(basename $script)**: Not executable" >> "$REPORT_FILE"
+        ((WARNINGS++))
+    else
+        echo "❌ $(basename $script) missing" | tee -a "$LOG_FILE"
+        echo "- ❌ **$(basename $script)**: Missing" >> "$REPORT_FILE"
+        ((ERRORS++))
+    fi
+done
+
+# Final statistics
+echo "" >> "$REPORT_FILE"
+echo "## 📈 Statistiche Finali" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+echo "- **Errori Totali**: $ERRORS" >> "$REPORT_FILE"
+echo "- **Warning Totali**: $WARNINGS" >> "$REPORT_FILE"
+
+# System info
+echo "- **OS**: $(cat /etc/os-release | grep PRETTY_NAME | cut -d'=' -f2 | tr -d '\"')" >> "$REPORT_FILE"
+echo "- **Kernel**: $(uname -r)" >> "$REPORT_FILE"
+echo "- **Architecture**: $(uname -m)" >> "$REPORT_FILE"
+echo "- **Memory**: $(free -h | grep '^Mem:' | awk '{print $2}')" >> "$REPORT_FILE"
+echo "- **CPU Cores**: $(nproc)" >> "$REPORT_FILE"
+
+# Final verdict
+echo "" >> "$REPORT_FILE"
+echo "## 🎯 Verdetto Finale" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+if [ $ERRORS -eq 0 ]; then
+    echo "### ✅ FASE 2A COMPLETATA CON SUCCESSO" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "Kubernetes e Docker sono stati configurati correttamente. L'ambiente è pronto per il deployment di InsightLearn.Cloud." >> "$REPORT_FILE"
+    
+    if [ $WARNINGS -gt 0 ]; then
+        echo "" >> "$REPORT_FILE"
+        echo "**Note**: $WARNINGS warning rilevati. Sistema funzionale ma con ottimizzazioni possibili." >> "$REPORT_FILE"
+    fi
+    
+    echo "" >> "$REPORT_FILE"
+    echo "### 🚀 Prossimi Passi" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "1. ✅ Kubernetes cluster ready" >> "$REPORT_FILE"
+    echo "2. ✅ Docker environment configured" >> "$REPORT_FILE"
+    echo "3. 🔄 Procedere con Fase 3: Design System e UI Components" >> "$REPORT_FILE"
+    echo "4. 🐳 Per test locale: \`./scripts/docker-dev.sh\`" >> "$REPORT_FILE"
+    
+    echo "✅ VERIFICA FASE 2A: SUCCESSO" | tee -a "$LOG_FILE"
+    echo "📊 Report generato: $REPORT_FILE" | tee -a "$LOG_FILE"
+    
+    exit 0
+else
+    echo "### ❌ FASE 2A RICHIEDE CORREZIONI" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "Sono stati rilevati $ERRORS errori critici nell'installazione di Kubernetes/Docker." >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "### 🔧 Azioni Necessarie" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "1. Controllare i log di installazione dettagliati" >> "$REPORT_FILE"
+    echo "2. Correggere gli errori identificati" >> "$REPORT_FILE"
+    echo "3. Rieseguire i step falliti" >> "$REPORT_FILE"
+    echo "4. Verificare che il cluster sia completamente funzionale" >> "$REPORT_FILE"
+    
+    echo "❌ VERIFICA FASE 2A: FALLITA ($ERRORS errori)" | tee -a "$LOG_FILE"
+    echo "📊 Report generato: $REPORT_FILE" | tee -a "$LOG_FILE"
+    
+    exit 1
+fi
+```
+
+## 📝 Istruzioni per Claude Code
+
+**ESEGUI ESATTAMENTE IN QUESTO ORDINE:**
+
+1. **STEP 2A.1**: Esegui `phase2a_step1_system_preparation.sh`
+   - Prepara sistema Debian per containers
+   - Installa prerequisiti e configura kernel
+
+2. **STEP 2A.2**: Esegui `phase2a_step2_docker_installation.sh`
+   - Installa Docker Engine e Docker Compose
+   - Configura daemon per Kubernetes
+
+3. **STEP 2A.3**: Esegui `phase2a_step3_kubernetes_installation.sh`
+   - Installa kubeadm, kubelet, kubectl
+   - Prepara sistema per cluster
+
+4. **STEP 2A.4**: Esegui `phase2a_step4_kubernetes_cluster_init.sh`
+   - Inizializza cluster Kubernetes
+   - Installa CNI (Flannel)
+   - Crea namespace insightlearn
+
+5. **STEP 2A.5**: Esegui `phase2a_step5_kubernetes_manifests.sh`
+   - Crea tutti i manifest K8s
+   - Genera Dockerfiles
+   - Prepara script helper
+
+6. **STEP 2A.6**: Esegui `phase2a_verification.sh`
+   - Verifica completa installazione
+   - Genera report dettagliato
+
+## ✅ Criterio di Successo Fase 2A
+
+La Fase 2A è completata quando:
+- [x] Docker installato e funzionante
+- [x] Kubernetes cluster attivo
+- [x] Namespace insightlearn creato
+- [x] Tutti i manifest K8s pronti
+- [x] Script helper funzionanti
+- [x] Verifica finale con 0 errori
+
+**Ora l'ambiente Kubernetes è pronto per ricevere i deployment di InsightLearn.Cloud!**

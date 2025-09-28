@@ -1,0 +1,226 @@
+@* SearchBar.razor - Advanced search with AI suggestions *@
+
+<div class="search-container">
+    <div class="relative">
+        <i class="search-icon fas fa-search"></i>
+        <input type="text" 
+               class="search-input" 
+               placeholder="@Placeholder"
+               @bind="SearchQuery"
+               @bind:event="oninput"
+               @onkeypress="OnKeyPress"
+               @onfocus="OnFocus"
+               @onblur="OnBlur" />
+        
+        @if (IsLoading)
+        {
+            <div class="absolute right-4 top-1/2 transform -translate-y-1/2">
+                <div class="spinner w-5 h-5"></div>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(SearchQuery))
+        {
+            <button class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    @onclick="ClearSearch">
+                <i class="fas fa-times"></i>
+            </button>
+        }
+    </div>
+    
+    @if (ShowSuggestions && Suggestions.Any())
+    {
+        <div class="absolute top-full left-0 right-0 mt-2 glass-card z-50">
+            @foreach (var suggestion in Suggestions.Take(MaxSuggestions))
+            {
+                <div class="suggestion-item p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                     @onclick="() => SelectSuggestion(suggestion)">
+                    <div class="flex items-center">
+                        <i class="fas fa-search text-gray-400 mr-3"></i>
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-900">@suggestion.Title</div>
+                            @if (!string.IsNullOrEmpty(suggestion.Category))
+                            {
+                                <div class="text-sm text-gray-500">in @suggestion.Category</div>
+                            }
+                        </div>
+                        @if (suggestion.Type == "AI")
+                        {
+                            <div class="ml-2 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
+                                AI Suggested
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            
+            @if (Suggestions.Count > MaxSuggestions)
+            {
+                <div class="p-3 text-center text-sm text-gray-500 border-t">
+                    @(Suggestions.Count - MaxSuggestions) more suggestions available
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Placeholder { get; set; } = "Search courses, topics, or ask AI...";
+    [Parameter] public int MaxSuggestions { get; set; } = 5;
+    [Parameter] public EventCallback<string> OnSearch { get; set; }
+    [Parameter] public EventCallback<SearchSuggestion> OnSuggestionSelected { get; set; }
+    [Parameter] public bool EnableAISuggestions { get; set; } = true;
+
+    private string _searchQuery = string.Empty;
+    private bool ShowSuggestions = false;
+    private bool IsLoading = false;
+    private List<SearchSuggestion> Suggestions = new();
+    private Timer? _debounceTimer;
+
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            _searchQuery = value;
+            DebounceSearch();
+        }
+    }
+
+    private void DebounceSearch()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                if (!string.IsNullOrWhiteSpace(SearchQuery))
+                {
+                    await LoadSuggestions();
+                }
+                else
+                {
+                    Suggestions.Clear();
+                    ShowSuggestions = false;
+                    StateHasChanged();
+                }
+            });
+        }, null, 300, Timeout.Infinite);
+    }
+
+    private async Task LoadSuggestions()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Simulate API call for suggestions
+            await Task.Delay(200);
+            
+            Suggestions = GenerateMockSuggestions(SearchQuery);
+            ShowSuggestions = Suggestions.Any();
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private List<SearchSuggestion> GenerateMockSuggestions(string query)
+    {
+        var suggestions = new List<SearchSuggestion>();
+        
+        // Regular search suggestions
+        suggestions.AddRange(new[]
+        {
+            new SearchSuggestion { Title = $"{query} - Complete Course", Category = "Courses", Type = "Course" },
+            new SearchSuggestion { Title = $"Advanced {query}", Category = "Courses", Type = "Course" },
+            new SearchSuggestion { Title = $"{query} for Beginners", Category = "Courses", Type = "Course" },
+        });
+
+        // AI-powered suggestions
+        if (EnableAISuggestions)
+        {
+            suggestions.AddRange(new[]
+            {
+                new SearchSuggestion { Title = $"AI recommends: {query} Fundamentals", Category = "AI Suggestion", Type = "AI" },
+                new SearchSuggestion { Title = $"Similar to {query}: Related Topics", Category = "AI Suggestion", Type = "AI" },
+            });
+        }
+
+        return suggestions.Take(10).ToList();
+    }
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            ShowSuggestions = false;
+            if (OnSearch.HasDelegate)
+            {
+                await OnSearch.InvokeAsync(SearchQuery);
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            ShowSuggestions = false;
+        }
+    }
+
+    private void OnFocus()
+    {
+        if (Suggestions.Any())
+        {
+            ShowSuggestions = true;
+        }
+    }
+
+    private void OnBlur()
+    {
+        // Delay hiding suggestions to allow for clicks
+        Task.Delay(200).ContinueWith(_ => 
+        {
+            InvokeAsync(() =>
+            {
+                ShowSuggestions = false;
+                StateHasChanged();
+            });
+        });
+    }
+
+    private async Task SelectSuggestion(SearchSuggestion suggestion)
+    {
+        SearchQuery = suggestion.Title;
+        ShowSuggestions = false;
+        
+        if (OnSuggestionSelected.HasDelegate)
+        {
+            await OnSuggestionSelected.InvokeAsync(suggestion);
+        }
+        
+        if (OnSearch.HasDelegate)
+        {
+            await OnSearch.InvokeAsync(suggestion.Title);
+        }
+    }
+
+    private void ClearSearch()
+    {
+        SearchQuery = string.Empty;
+        Suggestions.Clear();
+        ShowSuggestions = false;
+    }
+
+    public class SearchSuggestion
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
+    }
+}

@@ -1,0 +1,156 @@
+<div class="@GetCardClasses()" @onclick="OnClick">
+    @if (HeaderContent != null)
+    {
+        <div class="il-card-header">
+            @HeaderContent
+        </div>
+    }
+
+    @if (ImageUrl != null)
+    {
+        <div class="il-card-image">
+            <img src="@ImageUrl" alt="@ImageAlt" loading="lazy" />
+            @if (ImageOverlayContent != null)
+            {
+                <div class="il-card-image-overlay">
+                    @ImageOverlayContent
+                </div>
+            }
+        </div>
+    }
+
+    <div class="il-card-body">
+        @BodyContent
+    </div>
+
+    @if (FooterContent != null)
+    {
+        <div class="il-card-footer">
+            @FooterContent
+        </div>
+    }
+
+    @if (IsHoverable)
+    {
+        <div class="il-card-hover-effect"></div>
+    }
+</div>
+
+<style>
+.il-card-image {
+    position: relative;
+    overflow: hidden;
+}
+
+.il-card-image img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    transition: transform var(--il-duration-300) var(--il-ease-out);
+}
+
+.il-card:hover .il-card-image img {
+    transform: scale(1.05);
+}
+
+.il-card-image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.7) 100%);
+    display: flex;
+    align-items: flex-end;
+    padding: var(--il-space-4);
+    color: white;
+}
+
+.il-card-hover-effect {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--il-gradient-primary);
+    opacity: 0;
+    transition: opacity var(--il-duration-300) var(--il-ease-out);
+    pointer-events: none;
+    border-radius: inherit;
+    mix-blend-mode: overlay;
+}
+
+.il-card:hover .il-card-hover-effect {
+    opacity: 0.1;
+}
+
+.il-card-elevated {
+    box-shadow: var(--il-shadow-lg);
+}
+
+.il-card-elevated:hover {
+    box-shadow: var(--il-shadow-2xl);
+    transform: translateY(-8px);
+}
+
+.il-card-bordered {
+    border: 2px solid var(--il-border-primary);
+}
+
+.il-card-interactive {
+    cursor: pointer;
+}
+
+.il-card-interactive:active {
+    transform: scale(0.98) translateY(-2px);
+}
+</style>
+
+@code {
+    [Parameter] public RenderFragment? HeaderContent { get; set; }
+    [Parameter] public RenderFragment? BodyContent { get; set; }
+    [Parameter] public RenderFragment? FooterContent { get; set; }
+    [Parameter] public RenderFragment? ImageOverlayContent { get; set; }
+    [Parameter] public string? ImageUrl { get; set; }
+    [Parameter] public string? ImageAlt { get; set; }
+    [Parameter] public CardVariant Variant { get; set; } = CardVariant.Default;
+    [Parameter] public bool IsHoverable { get; set; } = true;
+    [Parameter] public bool IsElevated { get; set; }
+    [Parameter] public bool IsBordered { get; set; }
+    [Parameter] public bool IsInteractive { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    private string GetCardClasses()
+    {
+        var classes = new List<string> { "il-card" };
+
+        classes.Add(Variant switch
+        {
+            CardVariant.Glass => "il-card-glass",
+            CardVariant.Neuro => "il-card-neuro",
+            _ => ""
+        });
+
+        if (IsElevated)
+            classes.Add("il-card-elevated");
+
+        if (IsBordered)
+            classes.Add("il-card-bordered");
+
+        if (IsInteractive || OnClick.HasDelegate)
+            classes.Add("il-card-interactive");
+
+        if (!string.IsNullOrEmpty(CssClass))
+            classes.Add(CssClass);
+
+        return string.Join(" ", classes.Where(c => !string.IsNullOrEmpty(c)));
+    }
+
+    public enum CardVariant
+    {
+        Default,
+        Glass,
+        Neuro
+    }
+}

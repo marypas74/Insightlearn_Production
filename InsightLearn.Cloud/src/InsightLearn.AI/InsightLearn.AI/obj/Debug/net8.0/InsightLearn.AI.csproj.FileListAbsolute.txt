@@ -1,0 +1,15 @@
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/bin/Debug/net8.0/InsightLearn.AI.deps.json
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/bin/Debug/net8.0/InsightLearn.AI.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/bin/Debug/net8.0/InsightLearn.AI.pdb
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/bin/Debug/net8.0/InsightLearn.Core.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/bin/Debug/net8.0/InsightLearn.Core.pdb
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/InsightLearn.AI.csproj.AssemblyReference.cache
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/InsightLearn.AI.GeneratedMSBuildEditorConfig.editorconfig
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/InsightLearn.AI.AssemblyInfoInputs.cache
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/InsightLearn.AI.AssemblyInfo.cs
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/InsightLearn.AI.csproj.CoreCompileInputs.cache
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/InsightL.74FE9C96.Up2Date
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/InsightLearn.AI.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/refint/InsightLearn.AI.dll
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/InsightLearn.AI.pdb
+/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.AI/InsightLearn.AI/obj/Debug/net8.0/ref/InsightLearn.AI.dll

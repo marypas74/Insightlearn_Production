@@ -1,0 +1,108 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<button type="@ButtonType"
+        class="@GetButtonClasses()"
+        disabled="@IsDisabled"
+        @onclick="OnClick"
+        @onmouseenter="OnMouseEnter"
+        @onmouseleave="OnMouseLeave"
+        @onfocus="OnFocus"
+        @onblur="OnBlur">
+
+    @if (IsLoading)
+    {
+        <span class="il-loading-spinner"></span>
+    }
+
+    @if (!string.IsNullOrEmpty(IconLeft))
+    {
+        <i class="@IconLeft"></i>
+    }
+
+    <span class="il-btn-text">
+        @ChildContent
+    </span>
+
+    @if (!string.IsNullOrEmpty(IconRight))
+    {
+        <i class="@IconRight"></i>
+    }
+</button>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public ButtonVariant Variant { get; set; } = ButtonVariant.Primary;
+    [Parameter] public ButtonSize Size { get; set; } = ButtonSize.Medium;
+    [Parameter] public string ButtonType { get; set; } = "button";
+    [Parameter] public bool IsDisabled { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string? IconLeft { get; set; }
+    [Parameter] public string? IconRight { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnMouseEnter { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnMouseLeave { get; set; }
+    [Parameter] public EventCallback<FocusEventArgs> OnFocus { get; set; }
+    [Parameter] public EventCallback<FocusEventArgs> OnBlur { get; set; }
+
+    private string GetButtonClasses()
+    {
+        var classes = new List<string> { "il-btn" };
+
+        // Variant classes
+        classes.Add(Variant switch
+        {
+            ButtonVariant.Primary => "il-btn-primary",
+            ButtonVariant.Secondary => "il-btn-secondary",
+            ButtonVariant.Glass => "il-btn-glass",
+            ButtonVariant.Neuro => "il-btn-neuro",
+            ButtonVariant.Success => "il-btn-success",
+            ButtonVariant.Warning => "il-btn-warning",
+            ButtonVariant.Error => "il-btn-error",
+            _ => "il-btn-primary"
+        });
+
+        // Size classes
+        classes.Add(Size switch
+        {
+            ButtonSize.XSmall => "il-btn-xs",
+            ButtonSize.Small => "il-btn-sm",
+            ButtonSize.Medium => "",
+            ButtonSize.Large => "il-btn-lg",
+            ButtonSize.XLarge => "il-btn-xl",
+            _ => ""
+        });
+
+        if (IsLoading)
+        {
+            classes.Add("il-loading");
+        }
+
+        if (!string.IsNullOrEmpty(CssClass))
+        {
+            classes.Add(CssClass);
+        }
+
+        return string.Join(" ", classes.Where(c => !string.IsNullOrEmpty(c)));
+    }
+
+    public enum ButtonVariant
+    {
+        Primary,
+        Secondary,
+        Glass,
+        Neuro,
+        Success,
+        Warning,
+        Error
+    }
+
+    public enum ButtonSize
+    {
+        XSmall,
+        Small,
+        Medium,
+        Large,
+        XLarge
+    }
+}

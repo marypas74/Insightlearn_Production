@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-nginx
+  namespace: insightlearn
+  labels:
+    app: demo-nginx
+    component: demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: demo-nginx
+  template:
+    metadata:
+      labels:
+        app: demo-nginx
+        component: demo
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-nginx-service
+  namespace: insightlearn
+  labels:
+    app: demo-nginx
+spec:
+  selector:
+    app: demo-nginx
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-job
+  namespace: insightlearn
+  labels:
+    component: demo
+spec:
+  template:
+    metadata:
+      labels:
+        app: demo-job
+    spec:
+      containers:
+      - name: busybox
+        image: busybox
+        command: ["echo", "Dashboard Demo Job Completed"]
+      restartPolicy: Never
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-config
+  namespace: insightlearn
+  labels:
+    component: demo
+data:
+  message: "Welcome to InsightLearn Dashboard"
+  environment: "development"
+  version: "1.0.0"

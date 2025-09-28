@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(curl:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(python3:*)",
+      "Bash(chmod:*)",
+      "Bash(./clone_all_forks.sh:*)",
+      "Bash(git clone:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(sudo mv:*)",
+      "Bash(~/bin/kubectl version --client)",
+      "Bash(~/bin/kubectl cluster-info)",
+      "Bash(~/bin/minikube version)",
+      "Bash(~/bin/minikube start:*)",
+      "Bash(sh:*)",
+      "Bash(INSTALL_K3S_EXEC=\"--disable=traefik --write-kubeconfig-mode=644\" sh -s - --rootless)",
+      "Read(//etc/**)",
+      "Bash(~/bin/kubectl version --client --short)",
+      "Bash(~/bin/minikube status)",
+      "Bash(~/bin/kubectl config view --minify)",
+      "Bash(~/bin/kubectl config get-contexts)",
+      "Bash(systemctl status:*)",
+      "Bash(docker version:*)",
+      "Bash(sudo -S systemctl status:*)",
+      "Bash(kubectl get svc:*)",
+      "Bash(kubectl:*)",
+      "Bash(minikube docker-env:*)",
+      "Bash(export DOCKER_TLS_VERIFY=\"1\")",
+      "Bash(export:*)",
+      "Bash(export DOCKER_CERT_PATH=\"/home/mpasqui/.minikube/certs\")",
+      "Bash(docker rmi:*)",
+      "Bash(docker build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

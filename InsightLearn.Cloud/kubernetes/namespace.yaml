@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: insightlearn
+  labels:
+    name: insightlearn
+    environment: development
+    project: insightlearn-cloud
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: insightlearn-monitoring
+  labels:
+    name: insightlearn-monitoring
+    environment: development
+    project: insightlearn-cloud

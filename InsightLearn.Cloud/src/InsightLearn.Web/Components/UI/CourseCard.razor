@@ -1,0 +1,140 @@
+@* UdemyCourseCard.razor - Udemy-style course card component *@
+
+<a href="/course/@CourseId" class="udemy-course-card" @onclick="OnCardClick" @onclick:preventDefault="@(!string.IsNullOrEmpty(CourseId))">
+    @if (!string.IsNullOrEmpty(ImageUrl))
+    {
+        <img src="@ImageUrl" alt="@Title" class="udemy-course-image" />
+    }
+    else
+    {
+        <div class="udemy-course-image" style="background: linear-gradient(135deg, var(--primary-100), var(--secondary-100)); display: flex; align-items: center; justify-content: center;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--udemy-purple)" stroke-width="1">
+                <polygon points="5,3 19,12 5,21"></polygon>
+            </svg>
+        </div>
+    }
+
+    <div class="udemy-course-content">
+        <h3 class="udemy-course-title">@Title</h3>
+
+        @if (!string.IsNullOrEmpty(Instructor))
+        {
+            <p class="udemy-course-instructor">@Instructor</p>
+        }
+
+        <div class="udemy-course-rating">
+            <span class="udemy-rating-number">@Rating.ToString("0.0")</span>
+            <span class="udemy-rating-stars">
+                @{
+                    var fullStars = (int)Math.Floor(Rating);
+                    var hasHalfStar = Rating - fullStars >= 0.5;
+                    var emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+                }
+                @for (int i = 0; i < fullStars; i++)
+                {
+                    <span>★</span>
+                }
+                @if (hasHalfStar)
+                {
+                    <span>☆</span>
+                }
+                @for (int i = 0; i < emptyStars; i++)
+                {
+                    <span style="color: var(--neutral-300);">☆</span>
+                }
+            </span>
+            <span class="udemy-rating-count">(@ReviewCount.ToString("N0"))</span>
+        </div>
+
+        <div class="udemy-course-price">
+            @if (Price > 0)
+            {
+                @if (OriginalPrice > Price)
+                {
+                    <span style="text-decoration: line-through; color: var(--neutral-500); font-size: 14px; margin-right: 8px;">
+                        $@OriginalPrice.ToString("F2")
+                    </span>
+                }
+                $@Price.ToString("F2")
+            }
+            else
+            {
+                <span style="color: var(--secondary-600);">Free</span>
+            }
+        </div>
+
+        @if (ShowProgress && Progress > 0)
+        {
+            <div style="margin: 8px 0;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--neutral-600); margin-bottom: 4px;">
+                    <span>@Progress% complete</span>
+                </div>
+                <div style="width: 100%; height: 4px; background: var(--neutral-200); border-radius: 2px; overflow: hidden;">
+                    <div style="height: 100%; background: var(--udemy-purple); width: @Progress%; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+        }
+
+        @if (ShowBadge && !string.IsNullOrEmpty(BadgeText))
+        {
+            <div style="display: inline-block; background: var(--secondary-500); color: white; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 2px; margin-top: 4px;">
+                @BadgeText
+            </div>
+        }
+
+        @if (ShowEnrollButton)
+        {
+            <button class="udemy-btn udemy-btn-primary"
+                    style="width: 100%; margin-top: 8px; font-size: 12px; padding: 8px 12px;"
+                    @onclick="OnEnrollClick"
+                    @onclick:stopPropagation="true">
+                @if (IsEnrolled)
+                {
+                    Continue Learning
+                }
+                else
+                {
+                    Add to Cart
+                }
+            </button>
+        }
+    </div>
+</a>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public string ImageUrl { get; set; } = string.Empty;
+    [Parameter] public string Instructor { get; set; } = string.Empty;
+    [Parameter] public decimal Price { get; set; }
+    [Parameter] public decimal OriginalPrice { get; set; }
+    [Parameter] public double Rating { get; set; } = 5.0;
+    [Parameter] public int ReviewCount { get; set; }
+    [Parameter] public double Duration { get; set; }
+    [Parameter] public int StudentCount { get; set; }
+    [Parameter] public int Progress { get; set; }
+    [Parameter] public bool ShowProgress { get; set; }
+    [Parameter] public bool ShowEnrollButton { get; set; } = false;
+    [Parameter] public bool ShowBadge { get; set; } = false;
+    [Parameter] public string BadgeText { get; set; } = string.Empty;
+    [Parameter] public bool IsEnrolled { get; set; }
+    [Parameter] public EventCallback OnCardClick { get; set; }
+    [Parameter] public EventCallback OnEnrollClick { get; set; }
+    [Parameter] public string CourseId { get; set; } = string.Empty;
+
+    private async Task HandleCardClick()
+    {
+        if (OnCardClick.HasDelegate)
+        {
+            await OnCardClick.InvokeAsync();
+        }
+    }
+
+    private async Task HandleEnrollClick()
+    {
+        if (OnEnrollClick.HasDelegate)
+        {
+            await OnEnrollClick.InvokeAsync();
+        }
+    }
+}

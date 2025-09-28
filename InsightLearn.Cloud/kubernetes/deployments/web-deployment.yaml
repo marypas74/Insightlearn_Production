@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-web
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: web
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insightlearn
+      component: web
+  template:
+    metadata:
+      labels:
+        app: insightlearn
+        component: web
+        version: v1
+    spec:
+      containers:
+      - name: web
+        image: insightlearn/web:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+        envFrom:
+        - configMapRef:
+            name: insightlearn-config
+        - secretRef:
+            name: insightlearn-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insightlearn-api
+  namespace: insightlearn
+  labels:
+    app: insightlearn
+    component: api
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insightlearn
+      component: api
+  template:
+    metadata:
+      labels:
+        app: insightlearn
+        component: api
+        version: v1
+    spec:
+      containers:
+      - name: api
+        image: insightlearn/api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+        envFrom:
+        - configMapRef:
+            name: insightlearn-config
+        - secretRef:
+            name: insightlearn-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30

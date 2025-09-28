@@ -1,0 +1,261 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/InsightLearn.Web.csproj": {}
+  },
+  "projects": {
+    "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Core/InsightLearn.Core/InsightLearn.Core.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Core/InsightLearn.Core/InsightLearn.Core.csproj",
+        "projectName": "InsightLearn.Core",
+        "projectPath": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Core/InsightLearn.Core/InsightLearn.Core.csproj",
+        "packagesPath": "/home/mpasqui/.nuget/packages/",
+        "outputPath": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Core/InsightLearn.Core/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/mpasqui/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.10, )"
+            },
+            "System.ComponentModel.Annotations": {
+              "target": "Package",
+              "version": "[5.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.414/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/InsightLearn.Web.Client.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/InsightLearn.Web.Client.csproj",
+        "projectName": "InsightLearn.Web.Client",
+        "projectPath": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/InsightLearn.Web.Client.csproj",
+        "packagesPath": "/home/mpasqui/.nuget/packages/",
+        "outputPath": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/mpasqui/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.AspNetCore.Components.WebAssembly": {
+              "target": "Package",
+              "version": "[8.0.20, )"
+            },
+            "Microsoft.NET.ILLink.Tasks": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.20, )",
+              "autoReferenced": true
+            },
+            "Microsoft.NET.Sdk.WebAssembly.Pack": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.20, )",
+              "autoReferenced": true
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.NETCore.App.Runtime.Mono.browser-wasm",
+              "version": "[8.0.20, 8.0.20]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.414/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "browser-wasm": {
+          "#import": []
+        }
+      }
+    },
+    "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/InsightLearn.Web.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/InsightLearn.Web.csproj",
+        "projectName": "InsightLearn.Web",
+        "projectPath": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/InsightLearn.Web.csproj",
+        "packagesPath": "/home/mpasqui/.nuget/packages/",
+        "outputPath": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/mpasqui/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Core/InsightLearn.Core/InsightLearn.Core.csproj": {
+                "projectPath": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Core/InsightLearn.Core/InsightLearn.Core.csproj"
+              },
+              "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/InsightLearn.Web.Client.csproj": {
+                "projectPath": "/home/mpasqui/Kubernetes/InsightLearn.Cloud/src/InsightLearn.Web/InsightLearn.Web.Client/InsightLearn.Web.Client.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.AspNetCore.Authentication.Google": {
+              "target": "Package",
+              "version": "[8.0.20, )"
+            },
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[8.0.20, )"
+            },
+            "Microsoft.AspNetCore.Components.WebAssembly.Server": {
+              "target": "Package",
+              "version": "[8.0.20, )"
+            },
+            "Microsoft.AspNetCore.SignalR.Client": {
+              "target": "Package",
+              "version": "[8.0.20, )"
+            },
+            "Microsoft.Extensions.Caching.Redis": {
+              "target": "Package",
+              "version": "[2.3.0, )"
+            },
+            "MudBlazor": {
+              "target": "Package",
+              "version": "[8.12.0, )"
+            },
+            "MudBlazor.ThemeManager": {
+              "target": "Package",
+              "version": "[3.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.414/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

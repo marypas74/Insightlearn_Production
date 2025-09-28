@@ -1,0 +1,736 @@
+# Prompt per Claude Code - Verifica Fase 4: Autenticazione Multi-Layer
+
+## 🎯 Obiettivo della Verifica
+Verificare l'implementazione completa del sistema di autenticazione multi-layer (JWT + HTTP Cookies + Google OAuth) per InsightLearn.Cloud, con sistema avanzato di error recovery e retry automatico per garantire zero errori.
+
+## ⚙️ Configurazioni Operative con Error Recovery
+
+### Sistema di Logging Avanzato e Auto-Recovery
+- **OBBLIGATORIO**: Ogni comando bash deve avere log individuale + retry mechanism
+- **TIMEOUT**: Command timeout di 120 secondi per operazioni auth complesse
+- **AUTO-RETRY**: Loop automatico fino a risoluzione errori (max 5 tentativi)
+- **ERROR PARSING**: Analisi automatica log per identificazione errore specifico
+- **RECOVERY ACTIONS**: Azioni correttive automatiche basate su tipo errore
+
+### Template di Esecuzione con Error Recovery
+```bash
+#!/bin/bash
+set -e
+set -u
+
+# Setup logging avanzato con error recovery
+LOG_FILE="logs/phase4_verification_$(date +%Y%m%d_%H%M%S).log"
+REPORT_FILE="logs/PHASE4_AUTH_REPORT_$(date +%Y%m%d_%H%M%S).md"
+ERROR_LOG_DIR="logs/command_logs_$(date +%Y%m%d_%H%M%S)"
+mkdir -p logs "$ERROR_LOG_DIR"
+
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE")
+
+echo "=== [$(date)] PHASE 4 AUTH VERIFICATION WITH ERROR RECOVERY START ===" | tee -a "$LOG_FILE"
+
+# Sudo password e contatori
+SUDO_PASS="SS1-Temp1234"
+TOTAL_TESTS=0
+PASSED_TESTS=0
+FAILED_TESTS=0
+WARNING_TESTS=0
+RETRY_COUNT=0
+MAX_RETRIES=5
+
+# Advanced error recovery functions
+sudo_cmd() {
+    echo "$SUDO_PASS" | sudo -S "$@" 2>/dev/null || sudo "$@"
+}
+
+# Enhanced command execution with automatic retry and error recovery
+execute_with_retry() {
+    local cmd_name="$1"
+    local cmd_timeout="${2:-120}"
+    shift 2
+    local cmd_args=("$@")
+    
+    local attempt=1
+    local success=false
+    local cmd_log="$ERROR_LOG_DIR/${cmd_name}_$(date +%H%M%S).log"
+    
+    echo "🔄 Executing: $cmd_name (timeout: ${cmd_timeout}s)" | tee -a "$LOG_FILE"
+    
+    while [ $attempt -le $MAX_RETRIES ] && [ "$success" = "false" ]; do
+        echo "  Attempt $attempt/$MAX_RETRIES for $cmd_name" | tee -a "$LOG_FILE"
+        
+        # Execute command with timeout and capture all output
+        if timeout ${cmd_timeout}s "${cmd_args[@]}" > "$cmd_log" 2>&1; then
+            echo "  ✅ $cmd_name completed successfully on attempt $attempt" | tee -a "$LOG_FILE"
+            success=true
+            return 0
+        else
+            local exit_code=$?
+            echo "  ❌ $cmd_name failed on attempt $attempt (exit code: $exit_code)" | tee -a "$LOG_FILE"
+            
+            # Analyze error log for specific issues
+            analyze_and_recover_error "$cmd_name" "$cmd_log" "$exit_code"
+            
+            if [ $attempt -eq $MAX_RETRIES ]; then
+                echo "  🚨 $cmd_name FAILED after $MAX_RETRIES attempts" | tee -a "$LOG_FILE"
+                echo "  📋 Last error log:" | tee -a "$LOG_FILE"
+                tail -20 "$cmd_log" | sed 's/^/    /' | tee -a "$LOG_FILE"
+                return $exit_code
+            fi
+            
+            ((attempt++))
+            ((RETRY_COUNT++))
+            
+            # Progressive backoff delay
+            local delay=$((attempt * 2))
+            echo "  ⏳ Waiting ${delay}s before retry..." | tee -a "$LOG_FILE"
+            sleep $delay
+        fi
+    done
+    
+    return 1
+}
+
+# Intelligent error analysis and recovery
+analyze_and_recover_error() {
+    local cmd_name="$1"
+    local error_log="$2" 
+    local exit_code="$3"
+    
+    echo "  🔍 Analyzing error for $cmd_name..." | tee -a "$LOG_FILE"
+    
+    # Network/connectivity errors
+    if grep -qi "network\|connection\|timeout\|unreachable" "$error_log"; then
+        echo "  🔧 Network error detected, attempting connectivity fixes..." | tee -a "$LOG_FILE"
+        sudo_cmd systemctl restart systemd-resolved || true
+        sleep 2
+        return 0
+    fi
+    
+    # Package/dependency errors
+    if grep -qi "package.*not found\|dependency\|nuget\|package.*restore" "$error_log"; then
+        echo "  🔧 Package dependency error detected, cleaning and restoring..." | tee -a "$LOG_FILE"
+        dotnet clean > /dev/null 2>&1 || true
+        dotnet restore --force > /dev/null 2>&1 || true
+        return 0
+    fi
+    
+    # Build/compilation errors
+    if grep -qi "build.*failed\|compilation.*error\|cs[0-9]" "$error_log"; then
+        echo "  🔧 Build error detected, attempting build fixes..." | tee -a "$LOG_FILE"
+        dotnet clean > /dev/null 2>&1 || true
+        dotnet build --no-restore --verbosity quiet > /dev/null 2>&1 || true
+        return 0
+    fi
+    
+    # File permission errors
+    if grep -qi "permission.*denied\|access.*denied\|cannot.*write" "$error_log"; then
+        echo "  🔧 Permission error detected, fixing permissions..." | tee -a "$LOG_FILE"
+        sudo_cmd chown -R $USER:$USER . || true
+        sudo_cmd chmod -R 755 . || true
+        return 0
+    fi
+    
+    # Service/process errors
+    if grep -qi "service.*not.*running\|process.*not.*found\|port.*already.*use" "$error_log"; then
+        echo "  🔧 Service error detected, restarting services..." | tee -a "$LOG_FILE"
+        sudo_cmd systemctl daemon-reload || true
+        sudo_cmd pkill -f "dotnet\|InsightLearn" || true
+        sleep 3
+        return 0
+    fi
+    
+    # Database connection errors
+    if grep -qi "database\|connection.*string\|sql.*server\|mongodb\|redis" "$error_log"; then
+        echo "  🔧 Database error detected, checking database services..." | tee -a "$LOG_FILE"
+        sudo_cmd systemctl status docker || sudo_cmd systemctl start docker || true
+        docker compose -f docker/docker-compose.yml up -d > /dev/null 2>&1 || true
+        sleep 5
+        return 0
+    fi
+    
+    # Generic recovery attempts
+    echo "  🔧 Generic error recovery: clearing temp files and resetting environment..." | tee -a "$LOG_FILE"
+    rm -rf /tmp/NuGet* 2>/dev/null || true
+    rm -rf bin/ obj/ 2>/dev/null || true
+    export DOTNET_CLI_TELEMETRY_OPTOUT=1
+    return 0
+}
+
+# Test management functions with retry integration
+start_test() {
+    local test_name="$1"
+    echo "🧪 Testing: $test_name" | tee -a "$LOG_FILE"
+    ((TOTAL_TESTS++))
+}
+
+pass_test() {
+    local test_name="$1"
+    echo "✅ PASSED: $test_name" | tee -a "$LOG_FILE"
+    ((PASSED_TESTS++))
+}
+
+fail_test() {
+    local test_name="$1"
+    local error_msg="$2"
+    echo "❌ FAILED: $test_name - $error_msg" | tee -a "$LOG_FILE"
+    ((FAILED_TESTS++))
+}
+
+warn_test() {
+    local test_name="$1"
+    local warning_msg="$2"
+    echo "⚠️ WARNING: $test_name - $warning_msg" | tee -a "$LOG_FILE"
+    ((WARNING_TESTS++))
+}
+
+# Verifica directory di lavoro
+if [ ! -d "InsightLearn.Cloud" ]; then
+    echo "ERROR: Directory InsightLearn.Cloud non trovata" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+cd InsightLearn.Cloud
+echo "Working directory: $(pwd)" | tee -a "$LOG_FILE"
+```
+
+## 📋 VERIFICA COMPLETA FASE 4
+
+### STEP VERIFICA 4.1: Autenticazione JWT Implementation
+
+**Comando da eseguire:**
+```bash
+#!/bin/bash
+# phase4_verification_complete.sh
+
+# [Include template di configurazione sopra]
+
+# Inizializza report Markdown
+cat > "$REPORT_FILE" << EOF
+# InsightLearn.Cloud - Report Verifica Fase 4 (Autenticazione Multi-Layer)
+
+## 📅 Informazioni Generali
+- **Data Verifica**: $(date '+%Y-%m-%d %H:%M:%S')
+- **Fase**: Autenticazione Multi-Layer (JWT + Cookies + OAuth)
+- **Error Recovery**: Sistema automatico con retry fino a $MAX_RETRIES tentativi
+- **Directory**: $(pwd)
+
+## 📊 Risultati Verifiche
+
+EOF
+
+echo "Starting comprehensive Phase 4 verification with error recovery..." | tee -a "$LOG_FILE"
+
+# 1. VERIFICA BUILD E DIPENDENZE AUTH
+echo "=== STEP 4.1: Authentication Dependencies Verification ===" | tee -a "$LOG_FILE"
+echo "### 🔐 Dipendenze Autenticazione" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+start_test "Project Build with Auth Dependencies"
+cd src/InsightLearn.Web
+
+if execute_with_retry "project_build" 180 dotnet build --no-restore; then
+    pass_test "Project Build with Auth Dependencies"
+    echo "- ✅ **Build Status**: Successful with auth dependencies" >> "$REPORT_FILE"
+else
+    fail_test "Project Build with Auth Dependencies" "Build failed after $MAX_RETRIES attempts"
+    echo "- ❌ **Build Status**: Failed after retry attempts" >> "$REPORT_FILE"
+fi
+
+# Verifica NuGet packages di autenticazione
+declare -a AUTH_PACKAGES=(
+    "Microsoft.AspNetCore.Authentication.JwtBearer"
+    "Microsoft.AspNetCore.Authentication.Google"
+    "Microsoft.AspNetCore.Authentication.Cookies"
+    "System.IdentityModel.Tokens.Jwt"
+)
+
+for package in "${AUTH_PACKAGES[@]}"; do
+    start_test "Auth Package: $package"
+    
+    if execute_with_retry "check_package_$package" 30 dotnet list package; then
+        if grep -q "$package" "$ERROR_LOG_DIR/check_package_${package}_"*.log; then
+            PACKAGE_VERSION=$(grep "$package" "$ERROR_LOG_DIR/check_package_${package}_"*.log | awk '{print $NF}' | head -1)
+            pass_test "Auth Package: $package"
+            echo "- ✅ **$package**: $PACKAGE_VERSION" >> "$REPORT_FILE"
+        else
+            warn_test "Auth Package: $package" "Package not found but build succeeded"
+            echo "- ⚠️ **$package**: Not explicitly found" >> "$REPORT_FILE"
+        fi
+    else
+        fail_test "Auth Package: $package" "Package check failed"
+        echo "- ❌ **$package**: Verification failed" >> "$REPORT_FILE"
+    fi
+done
+
+cd ../..
+
+# 2. VERIFICA JWT CONFIGURATION
+echo "=== STEP 4.2: JWT Configuration Verification ===" | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "### 🔑 Configurazione JWT" >> "$REPORT_FILE"
+
+start_test "JWT Service Registration"
+PROGRAM_FILE="src/InsightLearn.Web/Program.cs"
+if [ -f "$PROGRAM_FILE" ]; then
+    # Verifica presenza configurazione JWT
+    JWT_CONFIG_COUNT=0
+    
+    if grep -q "AddAuthentication" "$PROGRAM_FILE"; then
+        ((JWT_CONFIG_COUNT++))
+    fi
+    if grep -q "JwtBearer\|AddJwtBearer" "$PROGRAM_FILE"; then
+        ((JWT_CONFIG_COUNT++))
+    fi
+    if grep -q "TokenValidationParameters" "$PROGRAM_FILE"; then
+        ((JWT_CONFIG_COUNT++))
+    fi
+    if grep -q "UseAuthentication\|UseAuthorization" "$PROGRAM_FILE"; then
+        ((JWT_CONFIG_COUNT++))
+    fi
+    
+    if [ $JWT_CONFIG_COUNT -ge 3 ]; then
+        pass_test "JWT Service Registration"
+        echo "- ✅ **JWT Configuration**: Complete ($JWT_CONFIG_COUNT/4 components)" >> "$REPORT_FILE"
+    elif [ $JWT_CONFIG_COUNT -ge 2 ]; then
+        warn_test "JWT Service Registration" "Partial configuration ($JWT_CONFIG_COUNT/4 components)"
+        echo "- ⚠️ **JWT Configuration**: Partial ($JWT_CONFIG_COUNT/4 components)" >> "$REPORT_FILE"
+    else
+        fail_test "JWT Service Registration" "Missing JWT configuration ($JWT_CONFIG_COUNT/4 components)"
+        echo "- ❌ **JWT Configuration**: Missing ($JWT_CONFIG_COUNT/4 components)" >> "$REPORT_FILE"
+    fi
+else
+    fail_test "JWT Service Registration" "Program.cs not found"
+    echo "- ❌ **JWT Configuration**: Program.cs not found" >> "$REPORT_FILE"
+fi
+
+# Verifica JWT Settings Configuration
+start_test "JWT Settings Configuration"
+CONFIG_FILES=(
+    "src/InsightLearn.Web/appsettings.json"
+    "src/InsightLearn.Web/appsettings.Development.json"
+)
+
+JWT_SETTINGS_FOUND=false
+for config_file in "${CONFIG_FILES[@]}"; do
+    if [ -f "$config_file" ]; then
+        if grep -q "Jwt\|JWT" "$config_file" && grep -q "SecretKey\|Issuer\|Audience" "$config_file"; then
+            JWT_SETTINGS_FOUND=true
+            break
+        fi
+    fi
+done
+
+if [ "$JWT_SETTINGS_FOUND" = "true" ]; then
+    pass_test "JWT Settings Configuration"
+    echo "- ✅ **JWT Settings**: Configured in appsettings" >> "$REPORT_FILE"
+else
+    warn_test "JWT Settings Configuration" "JWT settings not found in configuration files"
+    echo "- ⚠️ **JWT Settings**: Not found in appsettings" >> "$REPORT_FILE"
+fi
+
+# 3. VERIFICA GOOGLE OAUTH INTEGRATION
+echo "=== STEP 4.3: Google OAuth Integration Verification ===" | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "### 🔍 Google OAuth Integration" >> "$REPORT_FILE"
+
+start_test "Google OAuth Configuration"
+GOOGLE_OAUTH_SCORE=0
+
+if [ -f "$PROGRAM_FILE" ]; then
+    if grep -q "AddGoogle\|GoogleDefaults" "$PROGRAM_FILE"; then
+        ((GOOGLE_OAUTH_SCORE++))
+    fi
+    if grep -q "ClientId\|ClientSecret" "$PROGRAM_FILE"; then
+        ((GOOGLE_OAUTH_SCORE++))
+    fi
+fi
+
+# Check for Google OAuth settings in configuration
+for config_file in "${CONFIG_FILES[@]}"; do
+    if [ -f "$config_file" ]; then
+        if grep -q "Google" "$config_file" && grep -q "ClientId\|ClientSecret" "$config_file"; then
+            ((GOOGLE_OAUTH_SCORE++))
+            break
+        fi
+    fi
+done
+
+if [ $GOOGLE_OAUTH_SCORE -ge 2 ]; then
+    pass_test "Google OAuth Configuration"
+    echo "- ✅ **Google OAuth**: Well configured (score: $GOOGLE_OAUTH_SCORE/3)" >> "$REPORT_FILE"
+elif [ $GOOGLE_OAUTH_SCORE -eq 1 ]; then
+    warn_test "Google OAuth Configuration" "Partial configuration (score: $GOOGLE_OAUTH_SCORE/3)"
+    echo "- ⚠️ **Google OAuth**: Partial configuration (score: $GOOGLE_OAUTH_SCORE/3)" >> "$REPORT_FILE"
+else
+    fail_test "Google OAuth Configuration" "No Google OAuth configuration found"
+    echo "- ❌ **Google OAuth**: Not configured" >> "$REPORT_FILE"
+fi
+
+# 4. VERIFICA COOKIE AUTHENTICATION
+echo "=== STEP 4.4: Cookie Authentication Verification ===" | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "### 🍪 Cookie Authentication" >> "$REPORT_FILE"
+
+start_test "Cookie Authentication Setup"
+COOKIE_AUTH_SCORE=0
+
+if [ -f "$PROGRAM_FILE" ]; then
+    if grep -q "AddCookie\|CookieAuthenticationDefaults" "$PROGRAM_FILE"; then
+        ((COOKIE_AUTH_SCORE++))
+    fi
+    if grep -q "LoginPath\|LogoutPath" "$PROGRAM_FILE"; then
+        ((COOKIE_AUTH_SCORE++))
+    fi
+    if grep -q "ExpireTimeSpan\|SlidingExpiration" "$PROGRAM_FILE"; then
+        ((COOKIE_AUTH_SCORE++))
+    fi
+fi
+
+if [ $COOKIE_AUTH_SCORE -ge 2 ]; then
+    pass_test "Cookie Authentication Setup"
+    echo "- ✅ **Cookie Auth**: Configured (score: $COOKIE_AUTH_SCORE/3)" >> "$REPORT_FILE"
+elif [ $COOKIE_AUTH_SCORE -eq 1 ]; then
+    warn_test "Cookie Authentication Setup" "Basic configuration (score: $COOKIE_AUTH_SCORE/3)"
+    echo "- ⚠️ **Cookie Auth**: Basic configuration (score: $COOKIE_AUTH_SCORE/3)" >> "$REPORT_FILE"
+else
+    fail_test "Cookie Authentication Setup" "No cookie authentication found"
+    echo "- ❌ **Cookie Auth**: Not configured" >> "$REPORT_FILE"
+fi
+
+# 5. VERIFICA AUTH CONTROLLERS E SERVICES
+echo "=== STEP 4.5: Authentication Controllers and Services ===" | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "### 🎛️ Auth Controllers e Services" >> "$REPORT_FILE"
+
+declare -a AUTH_COMPONENTS=(
+    "Controllers/AuthController.cs:Authentication controller"
+    "Services/AuthService.cs:Authentication service"
+    "Services/JwtService.cs:JWT token service"
+    "Models/AuthModels.cs:Authentication models"
+)
+
+AUTH_COMPONENTS_SCORE=0
+for component_info in "${AUTH_COMPONENTS[@]}"; do
+    IFS=':' read -ra COMPONENT_PARTS <<< "$component_info"
+    component_path="${COMPONENT_PARTS[0]}"
+    component_desc="${COMPONENT_PARTS[1]}"
+    
+    start_test "Auth Component: $(basename $component_path)"
+    
+    FULL_PATH="src/InsightLearn.Web/$component_path"
+    ALT_PATH="src/InsightLearn.Api/$component_path"
+    
+    if [ -f "$FULL_PATH" ] || [ -f "$ALT_PATH" ]; then
+        # Determine which file exists
+        COMPONENT_FILE="$FULL_PATH"
+        [ -f "$ALT_PATH" ] && COMPONENT_FILE="$ALT_PATH"
+        
+        FILE_SIZE=$(stat -c%s "$COMPONENT_FILE")
+        LINE_COUNT=$(wc -l < "$COMPONENT_FILE")
+        
+        if [ $LINE_COUNT -gt 30 ] && [ $FILE_SIZE -gt 500 ]; then
+            pass_test "Auth Component: $(basename $component_path)"
+            echo "- ✅ **$(basename $component_path)**: Implemented ($LINE_COUNT lines)" >> "$REPORT_FILE"
+            echo "  - Description: $component_desc" >> "$REPORT_FILE"
+            ((AUTH_COMPONENTS_SCORE++))
+        else
+            warn_test "Auth Component: $(basename $component_path)" "Basic implementation ($LINE_COUNT lines)"
+            echo "- ⚠️ **$(basename $component_path)**: Basic ($LINE_COUNT lines)" >> "$REPORT_FILE"
+        fi
+    else
+        fail_test "Auth Component: $(basename $component_path)" "Component not found"
+        echo "- ❌ **$(basename $component_path)**: Not implemented" >> "$REPORT_FILE"
+    fi
+done
+
+# 6. VERIFICA AUTH ENDPOINTS
+echo "=== STEP 4.6: Authentication Endpoints Testing ===" | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "### 🔗 Authentication Endpoints" >> "$REPORT_FILE"
+
+start_test "Auth Endpoints Build Test"
+cd src/InsightLearn.Web
+
+# Build and run temporary server for endpoint testing
+if execute_with_retry "build_for_endpoint_test" 180 dotnet build --configuration Release; then
+    pass_test "Auth Endpoints Build Test"
+    echo "- ✅ **Endpoints Build**: Successful" >> "$REPORT_FILE"
+    
+    # Try to start server briefly to check endpoints
+    start_test "Server Startup Test"
+    if execute_with_retry "server_startup_test" 30 bash -c "timeout 10s dotnet run --urls=http://localhost:5080 &>/dev/null || true"; then
+        pass_test "Server Startup Test"
+        echo "- ✅ **Server Startup**: Functional" >> "$REPORT_FILE"
+    else
+        warn_test "Server Startup Test" "Server startup issues detected"
+        echo "- ⚠️ **Server Startup**: Issues detected" >> "$REPORT_FILE"
+    fi
+else
+    fail_test "Auth Endpoints Build Test" "Build failed for endpoint testing"
+    echo "- ❌ **Endpoints Build**: Failed" >> "$REPORT_FILE"
+fi
+
+cd ../..
+
+# 7. VERIFICA SECURITY CONFIGURATION
+echo "=== STEP 4.7: Security Configuration Verification ===" | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "### 🔒 Security Configuration" >> "$REPORT_FILE"
+
+start_test "Security Headers Configuration"
+SECURITY_SCORE=0
+
+if [ -f "$PROGRAM_FILE" ]; then
+    # Check for security configurations
+    if grep -q "UseHsts\|AddHsts" "$PROGRAM_FILE"; then
+        ((SECURITY_SCORE++))
+    fi
+    if grep -q "UseHttpsRedirection" "$PROGRAM_FILE"; then
+        ((SECURITY_SCORE++))
+    fi
+    if grep -q "UseCors\|AddCors" "$PROGRAM_FILE"; then
+        ((SECURITY_SCORE++))
+    fi
+    if grep -q "RequireHttpsMetadata.*false\|RequireHttpsMetadata.*true" "$PROGRAM_FILE"; then
+        ((SECURITY_SCORE++))
+    fi
+fi
+
+if [ $SECURITY_SCORE -ge 3 ]; then
+    pass_test "Security Headers Configuration"
+    echo "- ✅ **Security Headers**: Well configured ($SECURITY_SCORE/4)" >> "$REPORT_FILE"
+elif [ $SECURITY_SCORE -ge 2 ]; then
+    warn_test "Security Headers Configuration" "Basic security ($SECURITY_SCORE/4)"
+    echo "- ⚠️ **Security Headers**: Basic configuration ($SECURITY_SCORE/4)" >> "$REPORT_FILE"
+else
+    fail_test "Security Headers Configuration" "Insufficient security configuration"
+    echo "- ❌ **Security Headers**: Insufficient ($SECURITY_SCORE/4)" >> "$REPORT_FILE"
+fi
+
+# 8. VERIFICA DATABASE INTEGRATION PER AUTH
+echo "=== STEP 4.8: Database Integration for Auth ===" | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "### 🗄️ Database Integration" >> "$REPORT_FILE"
+
+start_test "Database Models for Auth"
+AUTH_DB_SCORE=0
+
+# Check for authentication-related models and contexts
+DB_FILES=(
+    "src/InsightLearn.Core/Entities/User.cs"
+    "src/InsightLearn.Core/Entities/UserRole.cs"
+    "src/InsightLearn.Infrastructure/Data/ApplicationDbContext.cs"
+    "src/InsightLearn.Infrastructure/Data/AuthDbContext.cs"
+)
+
+for db_file in "${DB_FILES[@]}"; do
+    if [ -f "$db_file" ]; then
+        if grep -q "User\|Auth\|Identity" "$db_file"; then
+            ((AUTH_DB_SCORE++))
+        fi
+    fi
+done
+
+if [ $AUTH_DB_SCORE -ge 2 ]; then
+    pass_test "Database Models for Auth"
+    echo "- ✅ **Database Models**: Configured ($AUTH_DB_SCORE/4 files)" >> "$REPORT_FILE"
+elif [ $AUTH_DB_SCORE -eq 1 ]; then
+    warn_test "Database Models for Auth" "Minimal database integration"
+    echo "- ⚠️ **Database Models**: Minimal ($AUTH_DB_SCORE/4 files)" >> "$REPORT_FILE"
+else
+    fail_test "Database Models for Auth" "No authentication database models found"
+    echo "- ❌ **Database Models**: Not found" >> "$REPORT_FILE"
+fi
+
+# 9. STATISTICHE FINALI E ERROR RECOVERY REPORT
+echo "=== STEP 4.9: Final Statistics and Error Recovery ===" | tee -a "$LOG_FILE"
+echo "" >> "$REPORT_FILE"
+echo "## 📊 Statistiche Finali" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+SUCCESS_RATE=$((PASSED_TESTS * 100 / TOTAL_TESTS))
+FAILURE_RATE=$((FAILED_TESTS * 100 / TOTAL_TESTS))
+WARNING_RATE=$((WARNING_TESTS * 100 / TOTAL_TESTS))
+
+echo "- **Test Totali**: $TOTAL_TESTS" >> "$REPORT_FILE"
+echo "- **Successi**: $PASSED_TESTS ($SUCCESS_RATE%)" >> "$REPORT_FILE"
+echo "- **Fallimenti**: $FAILED_TESTS ($FAILURE_RATE%)" >> "$REPORT_FILE"
+echo "- **Warning**: $WARNING_TESTS ($WARNING_RATE%)" >> "$REPORT_FILE"
+echo "- **Retry Totali**: $RETRY_COUNT" >> "$REPORT_FILE"
+echo "- **Error Recovery**: $([ $RETRY_COUNT -gt 0 ] && echo "Attivo ($RETRY_COUNT retry)" || echo "Non necessario")" >> "$REPORT_FILE"
+
+echo "" >> "$REPORT_FILE"
+echo "### 🔄 Error Recovery Report" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+if [ $RETRY_COUNT -gt 0 ]; then
+    echo "- **Sistema Error Recovery**: ✅ Funzionale" >> "$REPORT_FILE"
+    echo "- **Retry Eseguiti**: $RETRY_COUNT tentativi" >> "$REPORT_FILE"
+    echo "- **Comandi Recuperati**: Automaticamente risolti" >> "$REPORT_FILE"
+    echo "- **Log Directory**: \`$ERROR_LOG_DIR\`" >> "$REPORT_FILE"
+else
+    echo "- **Sistema Error Recovery**: ✅ Pronto (non necessario)" >> "$REPORT_FILE"
+    echo "- **Esecuzione**: Senza errori da correggere" >> "$REPORT_FILE"
+fi
+
+# Progress bar visuale
+echo "" >> "$REPORT_FILE"
+echo "### 📈 Progress Overview" >> "$REPORT_FILE"
+echo '```' >> "$REPORT_FILE"
+printf "Success   ["; for i in $(seq 1 $((SUCCESS_RATE/2))); do printf "█"; done; for i in $(seq $((SUCCESS_RATE/2 + 1)) 50); do printf "░"; done; printf "] %d%%\n" $SUCCESS_RATE >> "$REPORT_FILE"
+printf "Warnings  ["; for i in $(seq 1 $((WARNING_RATE/2))); do printf "█"; done; for i in $(seq $((WARNING_RATE/2 + 1)) 50); do printf "░"; done; printf "] %d%%\n" $WARNING_RATE >> "$REPORT_FILE"
+if [ $RETRY_COUNT -gt 0 ]; then
+    RETRY_RATE=$((RETRY_COUNT * 100 / TOTAL_TESTS))
+    printf "Recovery  ["; for i in $(seq 1 $((RETRY_RATE/2))); do printf "█"; done; for i in $(seq $((RETRY_RATE/2 + 1)) 50); do printf "░"; done; printf "] %d%%\n" $RETRY_RATE >> "$REPORT_FILE"
+fi
+echo '```' >> "$REPORT_FILE"
+
+# 10. VERDETTO FINALE
+echo "" >> "$REPORT_FILE"
+echo "## 🎯 Verdetto Finale" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+if [ $FAILED_TESTS -eq 0 ] && [ $SUCCESS_RATE -ge 85 ]; then
+    echo "### ✅ FASE 4 COMPLETATA CON SUCCESSO" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "Il sistema di autenticazione multi-layer è stato implementato correttamente. Sistema di error recovery $([ $RETRY_COUNT -gt 0 ] && echo "utilizzato efficacemente" || echo "pronto per utilizzo futuro")." >> "$REPORT_FILE"
+    
+    if [ $WARNING_TESTS -gt 0 ]; then
+        echo "" >> "$REPORT_FILE"
+        echo "**Note**: $WARNING_TESTS warning rilevati. Sistema funzionale ma con possibilità di ottimizzazione." >> "$REPORT_FILE"
+    fi
+    
+    echo "" >> "$REPORT_FILE"
+    echo "### 🚀 Prossimi Passi Raccomandati" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "1. ✅ **Autenticazione Multi-Layer** → Implementata e funzionale" >> "$REPORT_FILE"
+    echo "2. ✅ **Error Recovery System** → Testato e operativo" >> "$REPORT_FILE"
+    echo "3. 🔄 **Fase 5** → Procedere con Backend Services e API" >> "$REPORT_FILE"
+    echo "4. 🔐 **Security Testing** → Considerare penetration testing" >> "$REPORT_FILE"
+    
+    FINAL_EXIT_CODE=0
+    
+elif [ $FAILED_TESTS -le 2 ] && [ $SUCCESS_RATE -ge 70 ]; then
+    echo "### ⚠️ FASE 4 PARZIALMENTE COMPLETATA" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "L'autenticazione è funzionante ma presenta $FAILED_TESTS errori che necessitano correzione. Sistema di error recovery $([ $RETRY_COUNT -gt 0 ] && echo "ha tentato il recupero automatico" || echo "non è stato attivato")." >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "### 🔧 Azioni Correttive Necessarie" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "1. 🔍 **Analizzare i fallimenti** nei log specifici in \`$ERROR_LOG_DIR\`" >> "$REPORT_FILE"
+    echo "2. 🛠️ **Correggere i problemi** di autenticazione identificati" >> "$REPORT_FILE"
+    echo "3. 🔄 **Rieseguire la verifica** per testare il sistema di recovery" >> "$REPORT_FILE"
+    echo "4. ✅ **Completare l'implementazione** prima della Fase 5" >> "$REPORT_FILE"
+    
+    FINAL_EXIT_CODE=1
+    
+else
+    echo "### ❌ FASE 4 RICHIEDE INTERVENTO SIGNIFICATIVO" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "Sono stati rilevati problemi critici nell'autenticazione. Sistema di error recovery $([ $RETRY_COUNT -gt 0 ] && echo "ha tentato $RETRY_COUNT volte il recupero ma non è riuscito a risolvere tutti i problemi" || echo "non è riuscito ad attivarsi efficacemente")." >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "### 🚨 Azioni Immediate Richieste" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "1. 🛑 **FERMARE** lo sviluppo fino alla risoluzione" >> "$REPORT_FILE"
+    echo "2. 📋 **RIVEDERE** tutti i log in \`$ERROR_LOG_DIR\` e \`$LOG_FILE\`" >> "$REPORT_FILE"
+    echo "3. 🔄 **RIIMPLEMENTARE** i componenti di autenticazione falliti" >> "$REPORT_FILE"
+    echo "4. 🧪 **TESTARE** il sistema di error recovery manualmente" >> "$REPORT_FILE"
+    echo "5. ✅ **VERIFICARE** nuovamente prima di procedere" >> "$REPORT_FILE"
+    
+    FINAL_EXIT_CODE=2
+fi
+
+# Informazioni tecniche finali
+echo "" >> "$REPORT_FILE"
+echo "## 📋 Informazioni Tecniche" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+echo "- **Log File**: \`$LOG_FILE\`" >> "$REPORT_FILE"
+echo "- **Report File**: \`$REPORT_FILE\`" >> "$REPORT_FILE"
+echo "- **Command Logs**: \`$ERROR_LOG_DIR\`" >> "$REPORT_FILE"
+echo "- **Max Retries**: $MAX_RETRIES per command" >> "$REPORT_FILE"
+echo "- **Retry Count**: $RETRY_COUNT retry eseguiti" >> "$REPORT_FILE"
+echo "- **Timestamp**: $(date '+%Y-%m-%d %H:%M:%S')" >> "$REPORT_FILE"
+
+# Final console output
+echo "" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+echo "FASE 4 VERIFICATION COMPLETED" | tee -a "$LOG_FILE"
+echo "========================================" | tee -a "$LOG_FILE"
+echo "Total Tests: $TOTAL_TESTS" | tee -a "$LOG_FILE"
+echo "Passed: $PASSED_TESTS ($SUCCESS_RATE%)" | tee -a "$LOG_FILE"
+echo "Failed: $FAILED_TESTS ($FAILURE_RATE%)" | tee -a "$LOG_FILE"
+echo "Warnings: $WARNING_TESTS ($WARNING_RATE%)" | tee -a "$LOG_FILE"
+echo "Error Recovery: $RETRY_COUNT retries executed" | tee -a "$LOG_FILE"
+echo "" | tee -a "$LOG_FILE"
+echo "📊 Report dettagliato salvato in: $REPORT_FILE" | tee -a "$LOG_FILE"
+echo "📝 Log completo salvato in: $LOG_FILE" | tee -a "$LOG_FILE"
+echo "📋 Command logs salvati in: $ERROR_LOG_DIR" | tee -a "$LOG_FILE"
+
+if [ $FINAL_EXIT_CODE -eq 0 ]; then
+    echo "✅ VERIFICA COMPLETATA CON SUCCESSO - Autenticazione Multi-Layer Ready per Fase 5" | tee -a "$LOG_FILE"
+elif [ $FINAL_EXIT_CODE -eq 1 ]; then
+    echo "⚠️ VERIFICA PARZIALE - Correzioni necessarie prima di Fase 5" | tee -a "$LOG_FILE"
+else
+    echo "❌ VERIFICA FALLITA - Interventi significativi richiesti" | tee -a "$LOG_FILE"
+fi
+
+echo "=== [$(date)] FASE 4 VERIFICATION WITH ERROR RECOVERY END ===" | tee -a "$LOG_FILE"
+
+exit $FINAL_EXIT_CODE
+```
+
+## 📝 Istruzioni per l'Esecuzione
+
+### 1. **Sistema Error Recovery**
+Il prompt include un sistema avanzato di retry automatico:
+```bash
+# Ogni comando bash viene eseguito con:
+execute_with_retry "command_name" timeout_seconds command args...
+
+# Il sistema analizza automaticamente i log di errore e tenta correzioni
+# Fino a 5 tentativi per comando con progressive backoff
+```
+
+### 2. **Tipi di Errori Auto-Corretti**
+- **Network errors**: Restart servizi di rete
+- **Package errors**: Clean + restore dependencies
+- **Build errors**: Clean + rebuild con flags ottimizzati
+- **Permission errors**: Fix automatico permessi file
+- **Service errors**: Restart servizi e kill processi orfani
+- **Database errors**: Restart Docker e database services
+
+### 3. **Esecuzione Verifica**
+```bash
+# Salvare e rendere eseguibile
+chmod +x phase4_verification_complete.sh
+
+# Eseguire con error recovery automatico
+./phase4_verification_complete.sh
+```
+
+### 4. **Output e Logging**
+**File generati:**
+- `logs/phase4_verification_YYYYMMDD_HHMMSS.log`: Log principale
+- `logs/PHASE4_AUTH_REPORT_YYYYMMDD_HHMMSS.md`: Report dettagliato
+- `logs/command_logs_YYYYMMDD_HHMMSS/`: Directory con log individuali di ogni comando
+
+### 5. **Interpretazione Exit Codes**
+- `0`: Autenticazione implementata con successo
+- `1`: Implementazione parziale, correzioni minori necessarie
+- `2`: Implementazione fallita, interventi significativi richiesti
+
+### 6. **Criteri di Verifica (25+ test)**
+
+**Categorie verificate:**
+- ✅ Build con dipendenze auth (2 test)
+- ✅ JWT Configuration (3 test) 
+- ✅ Google OAuth Integration (2 test)
+- ✅ Cookie Authentication (2 test)
+- ✅ Auth Controllers/Services (4 test)
+- ✅ Authentication Endpoints (3 test)
+- ✅ Security Configuration (2 test)
+- ✅ Database Integration (2 test)
+- ✅ Error Recovery System (5+ metriche)
+
+Il sistema è progettato per garantire zero errori finali attraverso il retry automatico intelligente, assicurando che la Fase 4 sia completata senza problemi di implementazione.
