@@ -85,3 +85,6 @@ Thumbs.db
 !*.yaml
 !*.yml
 !Makefile
+# 📁 Exclude sub-repositories (use as reference only)
+InsightLearn-New/
+InsightLearn/Insightlearn/
